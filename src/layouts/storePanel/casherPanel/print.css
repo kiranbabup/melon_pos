@@ -1,0 +1,16 @@
+/* print.css */
+@media print {
+  @page {
+    size: auto;   /* page height = content height */
+    margin: 0;    /* remove default browser margins */
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-container {
+    page-break-after: avoid;
+      }
+}
