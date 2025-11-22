@@ -17,7 +17,7 @@ import {
 import { useState } from "react";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 
-function UserModal({
+function BranchModal({
   open,
   onClose,
   formData,
@@ -163,4 +163,4 @@ function UserModal({
     </Dialog>
   );
 }
-export default UserModal;
+export default BranchModal;

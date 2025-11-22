@@ -1,57 +1,48 @@
 import { Box, Typography } from "@mui/material";
-import LeftPannel from "../../../components/LeftPannel";
-import HeaderPannel from "../../../components/HeaderPannel";
+import LeftPannel from "../../components/LeftPannel";
+import HeaderPannel from "../../components/HeaderPannel";
+import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
 import { useEffect, useState } from "react";
 // import { PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer, BarChart, YAxis, XAxis, Bar } from "recharts";
-import CountCard from "../../../components/dashboard_components/CountCard";
-import { getStoreDashboardStats } from "../../../services/api";
+import CountCard from "../../components/dashboard_components/CountCard";
+import { getDashboardStats } from "../../services/api";
 import LocalMallIcon from "@mui/icons-material/LocalMall";
+import BrandingWatermarkRoundedIcon from "@mui/icons-material/BrandingWatermarkRounded";
+import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
 import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import BookmarkRemoveIcon from "@mui/icons-material/BookmarkRemove";
 import DangerousIcon from "@mui/icons-material/Dangerous";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
+import StoreIcon from "@mui/icons-material/Store";
 import { useNavigate } from "react-router-dom";
-import LsService, { storageKey } from "../../../services/localstorage";
-import MuseumIcon from "@mui/icons-material/Museum";
-import { formatToINR } from "../../../data/functions";
+import LsService, { storageKey } from "../../services/localstorage";
+import { formatToINR } from "../../data/functions";
 
 const COLORS = ["green", "red"];
 
-const StoreAdminDashboard = () => {
+const AdminPanelDashboard = () => {
   // const [allProduactsCount, setAllProduactsCount] = useState(0);
   // const [allStores, setAllStores] = useState(0);
   const [counts, setCounts] = useState({});
-  const [mrp, setMrp] = useState(0);
-  const [sp, setSp] = useState(0);
   const navigate = useNavigate();
   const user = LsService.getItem(storageKey);
 
   useEffect(() => {
-    // getAllStores().then(res => {
-    //   console.log(res.data);
-    //   // setAllStores(res.data.products?.length || 0);
-    // })
-    //   .catch(() => setAllStores(0));
-
-    if (user.store_id) {
-      getStoreDashboardStats(user.store_id)
-        .then((res) => {
-          // console.log(res.data);
-          setCounts(res.data || {});
-          setMrp(res.data?.storeProductsMrpPrice[0]?.total_mrp_value || 0);
-          setSp(
-            res.data?.storeProductsDiscountPrice[0]?.total_discount_value || 0
-          );
-        })
-        .catch(() => setCounts({}));
-    }
+    const fetchTableData = async () => {
+        try {
+          const response = await getDashboardStats(user.branch_id);
+          console.log(response.data);
+          setCounts(response.data.data);
+        } catch (error) {
+          console.error("Error fetching products:", error);}
+      };
+      fetchTableData();
   }, []);
 
-  useEffect(() => {
-    // console.log(user);
 
-    if (user.role !== "store") {
+  useEffect(() => {
+    if (user.role !== "admin") {
       LsService.removeItem(storageKey);
       navigate("/");
     }
@@ -62,49 +53,85 @@ const StoreAdminDashboard = () => {
       HeadTitle: "Total Products",
       IconCompo: LocalMallIcon,
       Value: counts.totalProducts || 0,
-      navpath: "/store-inventory",
+      navpath: "/inventory",
+    },
+    // {
+    //   HeadTitle: "Total Staff",
+    //   IconCompo: SupervisorAccountIcon,
+    //   Value: counts.totalUsers || 0,
+    //   navpath: "/users_management"
+    // },
+    {
+      HeadTitle: "Total Customers",
+      IconCompo: SupervisorAccountIcon,
+      Value: counts.totalCustomers || 0,
+      navpath: "/manage_customers",
     },
     {
       HeadTitle: "Total Orders",
       IconCompo: TrackChangesIcon,
       Value: counts.totalOrders || 0,
-      navpath: "/store-billings",
+      navpath: "/billings",
+    },
+    // {
+    //   HeadTitle: "Total Stores",
+    //   IconCompo: StoreIcon,
+    //   Value: counts.totalStores || 0,
+    //   navpath: "/stores"
+    // },
+    // {
+    //   HeadTitle: "Total Brands",
+    //   IconCompo: BrandingWatermarkRoundedIcon,
+    //   Value: counts.brandsCount || 0,
+    //   navpath: "/brands",
+    // },
+    // {
+    //   HeadTitle: "Total Categories",
+    //   IconCompo: CategoryRoundedIcon,
+    //   Value: counts.categoriesCount || 0,
+    //   navpath: "/categories",
+    // },
+    // {
+    //   HeadTitle: "Total Suppliers",
+    //   IconCompo: SupervisorAccountIcon,
+    //   Value: counts.suppliersCount || 0,
+    //   navpath: "/suppliers"
+    // },
+    {
+      HeadTitle: "Total Low Stock Products",
+      IconCompo: BookmarkRemoveIcon,
+      Value: counts.lowStockProducts || 0,
+      navpath: "/products",
+    },
+    {
+      HeadTitle: "Total Out of Stock Products",
+      IconCompo: DangerousIcon,
+      Value: counts.outOfStockProducts || 0,
+      navpath: "/products",
     },
     {
       HeadTitle: "Total Sales",
       IconCompo: ShowChartIcon,
       Value: `₹${formatToINR(counts.totalSales)}` || 0,
-      navpath: "/store-billings",
+      navpath: "/billings",
     },
     {
       HeadTitle: "Daily Sales",
       IconCompo: TrendingDownRoundedIcon,
-      Value: `₹${formatToINR(counts.todaySales)}` || 0,
-      navpath: "/store-billings",
+      Value: counts?.todaySales ? `₹${formatToINR(counts?.todaySales)}` : 0,
+      navpath: "/billings",
     },
     {
       HeadTitle: "Total Weekly Sales",
       IconCompo: TrendingDownRoundedIcon,
-      Value: `₹${formatToINR(counts.weekSales)}` || 0,
-      navpath: "/store-billings",
+      Value: counts?.weekSales ? `₹${formatToINR(counts?.weekSales)}` : 0,
+      navpath: "/billings",
     },
     {
       HeadTitle: "Total Monthly Sales",
       IconCompo: TrendingDownRoundedIcon,
-      Value: `₹${formatToINR(counts.monthSales)}` || 0,
-      navpath: "/store-billings",
-    },
-    {
-      HeadTitle: "Total Store MRP",
-      IconCompo: MuseumIcon,
-      Value: `₹${formatToINR(mrp)}`,
-      navpath: "/store-inventory",
-    },
-    {
-      HeadTitle: "Total Store SP",
-      IconCompo: MuseumIcon,
-      Value: `₹${formatToINR(sp)}`,
-      navpath: "/store-inventory",
+      Value: counts?.monthSales ? `₹${formatToINR(counts?.monthSales)}` : 0,
+      navpath: "/billings",
     },
   ];
 
@@ -131,12 +158,13 @@ const StoreAdminDashboard = () => {
           alignItems: "start",
           width: "18vw",
           mt: 1.5,
+          ml: 1,
         }}
       >
-        <LeftPannel HeaderTitle="Store Manager" />
+        <LeftPannel HeaderTitle="Super Admin" />
       </Box>
       <Box sx={{ minWidth: "calc( 99vw - 18vw)", ml: 1.5 }}>
-        <HeaderPannel HeaderTitle="Store Manager" />
+        <HeaderPannel HeaderTitle="Super Admin Dashboard" />
 
         {/* Body starts here */}
         <Box sx={{ width: "99%", mb: 4 }}>
@@ -213,4 +241,4 @@ const StoreAdminDashboard = () => {
   );
 };
 
-export default StoreAdminDashboard;
+export default AdminPanelDashboard;

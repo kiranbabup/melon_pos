@@ -1,3 +1,4 @@
+// LoginPage.jsx
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -26,16 +27,14 @@ const LoginPage = () => {
   const user = LsService.getItem(storageKey);
 
   useEffect(() => {
-    // console.log(user);
+    console.log(user);
     if (user) {
-      if (user.role === "admin") {
-        navigate("/super-admin");
-        // } else if (user.role === "warehouse") {
-        //     navigate("/warehouse-admin");
-        // } else if (user.role === "store") {
-        //     navigate("/store-manager");
+      if (user.role === "super_admin") {
+        navigate("/super_admin");
+      } else if (user.role === "admin") {
+        navigate("/admin_panel");
       } else if (user.role === "cashier") {
-        navigate("/cashier-panel");
+        navigate("/cashier_billing_panel");
       }
     } else {
       return;
@@ -47,46 +46,34 @@ const LoginPage = () => {
   };
 
   const handleLogin = async () => {
-    setErrorMsg(""); // Clear previous errors
+    setErrorMsg("");
     try {
-      // API login for admin/casher
       const response = await login({ email: loginId, password });
-      // console.log(response.data);
-      const {token} = response.data;
-      const { branch_id, name, role, status, user_id, } = response.data.user;
+      console.log(response.data);
+      const { token } = response.data;
+      const branchDetails = response.data.user.Branch;
+      const { branch_id, name, role, status, user_id } = response.data.user;
       if (!status) {
         setErrorMsg(
           "Your account is inactive. Please contact the administrator."
         );
         return;
       }
-
-      if (role === "admin") {
-        LsService.setItem(storageKey, {
-          username: name,
-          role,
-          store_code: branch_id,
-          email: loginId,
-          user_id,
-          token,
-        });
-        navigate("/super-admin");
-        // } else if (role === "warehouse") {
-        //     LsService.setItem(storageKey, { username: loginId, role, store_code, });
-        //     navigate("/warehouse-admin");
-        // } else if (role === "store") {
-        //     LsService.setItem(storageKey, { username: loginId, role, store_code, store_id, user_id});
-        //     navigate("/store-manager");
+      LsService.setCurrentUser({
+        username: name,
+        role,
+        branch_id,
+        email: loginId,
+        user_id,
+        token,
+        branchDetails,
+      });
+      if (role === "super_admin") {
+        navigate("/super_admin");
+      } else if (role === "admin") {
+        navigate("/admin_panel");
       } else if (role === "cashier") {
-        LsService.setItem(storageKey, {
-          username: name,
-          role,
-          store_code: branch_id,
-          email: loginId,
-          user_id,
-          token
-        });
-        navigate("/cashier-panel");
+        navigate("/cashier_billing_panel");
       } else {
         setErrorMsg("Invalid user type.");
       }

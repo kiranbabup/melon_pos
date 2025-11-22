@@ -1,9 +1,5 @@
+// AdminBillingPage
 import React, { useEffect, useState } from "react";
-import {
-  getAllStores,
-  getAllOrders,
-  getStoreUsers,
-} from "../../../services/api";
 import {
   Box,
   Typography,
@@ -19,17 +15,20 @@ import {
   TableHead,
   TableRow,
   Collapse,
+  CircularProgress,
   IconButton,
 } from "@mui/material";
-import LeftPannel from "../../../components/LeftPannel";
-import HeaderPannel from "../../../components/HeaderPannel";
+import LeftPannel from "../../components/LeftPannel";
+import HeaderPannel from "../../components/HeaderPannel";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import TablePagination from "@mui/material/TablePagination";
 import * as XLSX from "xlsx";
+import { getAllOrders } from "../../services/api";
 
-function Row({ order }) {
+function Row({ order, onPrintReceipt }) {
   const [open, setOpen] = useState(false);
+//   console.log(order);
 
   return (
     <>
@@ -40,21 +39,19 @@ function Row({ order }) {
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{order.invoice_number}</TableCell>
+        <TableCell>{order.sno}</TableCell>
+        <TableCell>INV{order.invoice_number}</TableCell>
         <TableCell>
-          {order.customerDetails === null
-            ? "N/A"
-            : order.customerDetails?.customerName}
+          {order.customer_name ? order.customer_name : "N/A"}
         </TableCell>
         <TableCell>
-          {order.customerDetails === null
-            ? order.customerPhone
-            : order.customerDetails?.customerMobile}
+          {order.customer_phone ? order.customer_phone : "N/A"}
         </TableCell>
         <TableCell>
           {order.order_date} {order.order_time}
         </TableCell>
         <TableCell>{order.paymentMethod}</TableCell>
+        <TableCell>₹{order.discount_price}</TableCell>
         <TableCell>₹{order.total}</TableCell>
         <TableCell>{order.user_name}</TableCell>
       </TableRow>
@@ -82,7 +79,7 @@ function Row({ order }) {
                     </TableCell>
                     <TableCell
                       sx={{ color: "white", fontWeight: "bold" }}
-                      align="right"
+                      align="center"
                     >
                       Qty
                     </TableCell>
@@ -98,6 +95,12 @@ function Row({ order }) {
                     >
                       GST
                     </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="center"
+                    >
+                      isCombo
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -105,9 +108,12 @@ function Row({ order }) {
                     <TableRow key={idx}>
                       <TableCell>{item.barcode}</TableCell>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell align="right">{item.quantity}</TableCell>
+                      <TableCell align="center">{item.quantity}</TableCell>
                       <TableCell align="right">₹{item.price}</TableCell>
                       <TableCell align="right">{item.gst}%</TableCell>
+                      <TableCell align="center">
+                        {item.is_combo === true ? "Yes" : "No"}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -120,15 +126,9 @@ function Row({ order }) {
   );
 }
 
-function Billings() {
+function DisplayCombosTable() {
   const [loading, setLoading] = useState(false);
-  const [stores, setStores] = useState([]);
-  const [storeId, setStoreId] = useState(0);
-  const [users, setUsers] = useState([]);
-  const [userId, setUserId] = useState("");
   const [orders, setOrders] = useState([]);
-  const [productMesg, setProductMesg] = useState("");
-  const [productErrMesg, setProductErrMesg] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -142,72 +142,63 @@ function Billings() {
   }, [orders]);
 
   useEffect(() => {
-    const fetchDropdowns = async () => {
-      try {
-        const strRes = await getAllStores();
-        setStores(strRes.data.stores || []);
-      } catch (err) {
-        console.error("Failed to fetch dropdown data", err);
-      }
-    };
-    fetchDropdowns();
+    setPage(0); // go back to page 0 whenever orders change
+  }, [orders]);
+
+  useEffect(() => {
+    fetchStoreOrders();
   }, []);
-
-  const fetchUsers = async (strId) => {
-    try {
-      const strUsers = await getStoreUsers(strId);
-      // console.log(strUsers);
-
-      setUsers(strUsers.data.users || []);
-    } catch (err) {
-      console.error("Failed to fetch users by store", err);
-    }
-  };
 
   const fetchStoreOrders = async () => {
     try {
-      setProductMesg("");
-      setProductErrMesg("");
       setLoading(true);
-      const payload = {
-        user_id: userId || "",
-        store_id: storeId,
-      };
-      // console.log(payload);
 
-      const response = await getAllOrders(payload);
-      // console.log(response);
-      // console.log(response.data.orders);
+      const response = await getAllOrders();
+      console.log(response.data);
 
-      setOrders(response.data.orders.reverse() || []);
+      const apiOrders = response.data.data || [];
 
-      setProductMesg(response.data.message);
+      const mappedOrders = apiOrders.map((o, i) => {
+        const orderDateObj = new Date(o.order_date);
+        const orderDateStr = orderDateObj.toISOString().slice(0, 10); // YYYY-MM-DD
+        const orderTimeStr = orderDateObj.toTimeString().slice(0, 5); // HH:MM
+
+        // Map OrderProducts -> cart[]
+        const cart = (o.OrderProducts || []).map((op) => {
+          const prod = Array.isArray(op.Products)
+            ? op.Products[0]
+            : op.Products;
+          return {
+            barcode: prod?.barcode || "N/A",
+            name: prod?.product_name || `#${op.pr_id}`,
+            quantity: op.quantity,
+            price: Number(op.price),
+            gst: Number(prod?.gst || 0),
+            is_combo: !!op.is_combo,
+          };
+        });
+
+        return {
+          ...o,
+          sno: i + 1,
+          cart, // used by Row + onPrintReceipt
+          invoice_number: o.order_id, // use order_id as invoice
+          order_date: orderDateStr,
+          order_time: orderTimeStr,
+          paymentMethod: o.payment_method,
+          total: Number(o.total_amount || 0),
+          user_name: o.user_name || "Cashier", // if you store user name
+        };
+      });
+
+      setOrders(mappedOrders);
     } catch (error) {
-      setProductErrMesg(error.response.data.message);
+      console.error(error);
+      
     } finally {
       setLoading(false);
-      setTimeout(() => {
-        setProductErrMesg("");
-        setProductMesg("");
-      }, 20000);
     }
   };
-
-  useEffect(() => {
-    if (storeId > 0) {
-      setUserId(""); // reset user filter when store changes
-      setOrders([]);
-      fetchStoreOrders();
-      fetchUsers(storeId);
-    }
-  }, [storeId]);
-
-  useEffect(() => {
-    if (userId !== "") {
-      setOrders([]);
-      fetchStoreOrders();
-    }
-  }, [userId]);
 
   const onDownloadxl = () => {
     if (paginatedOrders.length === 0) {
@@ -261,7 +252,7 @@ function Billings() {
     const filename = `Billings_${startRow}-${endRow}_of_${orders.length}.xlsx`;
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
-    
+
     // Rest of the code remains same
     worksheet["!cols"] = [
       { wch: 5 }, // S_No
@@ -285,7 +276,7 @@ function Billings() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Billings");
     XLSX.writeFile(workbook, filename);
-};
+  };
 
   return (
     <Box
@@ -311,132 +302,84 @@ function Billings() {
 
       <Box sx={{ minWidth: "calc( 99vw - 18vw)" }}>
         <HeaderPannel
-          HeaderTitle="View Billings"
+          HeaderTitle="Bills Generated"
           tableData={orders}
           onDownloadCurrentList={onDownloadxl}
         />
 
         <Box sx={{ width: "99%" }}>
-          <Box
-            sx={{
-              borderRadius: "10px",
-              boxShadow:
-                "rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px",
-              height: "100%",
-              p: 2,
-              mb: 1,
-              background: "#fff",
-              display: "flex",
-              justifyContent: "space-between",
-            }}
-          >
-            {/* <IconButton onClick={() => fetchCitiesData()} ><RefreshIcon /></IconButton> */}
-            <Box
-              sx={{
-                width: "99%",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
-              <FormControl sx={{ width: "25%", marginBottom: 2 }}>
-                <InputLabel>Stores</InputLabel>
-                <Select
-                  name="store_id"
-                  value={storeId}
-                  onChange={(e) => setStoreId(e.target.value)}
-                  disabled={loading}
-                >
-                  {stores.map((u) => (
-                    <MenuItem key={u.store_id} value={u.store_id}>
-                      {u.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {productMesg && (
-                <Typography sx={{ color: "green", fontSize: "0.9rem" }}>
-                  {productMesg}
-                </Typography>
-              )}
-              {productErrMesg && (
-                <Typography sx={{ color: "red", fontSize: "0.9rem" }}>
-                  {productErrMesg}
-                </Typography>
-              )}
-              {users.length !== 0 && (
-                <FormControl sx={{ width: "25%", marginBottom: 2 }}>
-                  <InputLabel>Store Users</InputLabel>
-                  <Select
-                    name="user_id"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    disabled={loading}
-                  >
-                    {users.map((u) => (
-                      <MenuItem key={u.user_id} value={u.user_id}>
-                        {u.username}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            </Box>
-          </Box>
-
           <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow
-                  sx={{
-                    backgroundColor: "#0d3679",
-                  }}
-                >
-                  <TableCell />
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Invoice No
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Customer
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Mobile
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Order Date
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Payment
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Total
-                  </TableCell>
-                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                    Cashier
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedOrders.map((order) => (
-                  <Row key={order.order_id} order={order} />
-                ))}
-              </TableBody>
-            </Table>
-            <TablePagination
-              component="div"
-              count={orders.length}
-              page={page}
-              onPageChange={(event, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(event) => {
-                setRowsPerPage(parseInt(event.target.value, 10));
-                setPage(0); // reset to first page
-              }}
-              rowsPerPageOptions={[10, 80]}
-            />
-          </TableContainer>
+                    <Table>
+                      {loading ? (
+                        <TableBody>
+                          <TableRow>
+                            <TableCell colSpan={9} align="center">
+                              <CircularProgress color="primary" />
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      ) : (
+                        <>
+                          <TableHead>
+                            <TableRow
+                              sx={{
+                                backgroundColor: "#0d3679",
+                              }}
+                            >
+                              <TableCell />
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                S No
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Invoice No
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Customer
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Mobile
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Order Date
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Payment
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Discount
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Total
+                              </TableCell>
+                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                                Cashier
+                              </TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {paginatedOrders.map((order) => (
+                              <Row
+                                key={order.order_id}
+                                order={order}
+                              />
+                            ))}
+                          </TableBody>
+                        </>
+                      )}
+                    </Table>
+                    <TablePagination
+                      component="div"
+                      count={orders.length}
+                      page={page}
+                      onPageChange={(event, newPage) => setPage(newPage)}
+                      rowsPerPage={rowsPerPage}
+                      onRowsPerPageChange={(event) => {
+                        setRowsPerPage(parseInt(event.target.value, 10));
+                        setPage(0); // reset to first page
+                      }}
+                      rowsPerPageOptions={[10, 25, 50]}
+                    />
+                  </TableContainer>
           <Box p={1} />
         </Box>
       </Box>
@@ -444,4 +387,4 @@ function Billings() {
   );
 }
 
-export default Billings;
+export default DisplayCombosTable;

@@ -2,9 +2,9 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import LsService, { storageKey } from "../services/localstorage";
 
 const roleDefaultPaths = {
-  admin: "/super-admin",
-  store: "/store-manager",
-  cashier: "/cashier-panel",
+  super_admin: "/super_admin",
+  admin: "/admin_panel",
+  cashier: "/cashier_billing_panel",
 };
 
 const ProtectedRoute = ({ loggedinUserRole }) => {

@@ -1,21 +1,118 @@
+// api.js
 import axios from 'axios'
+import LsService from './localstorage';
 
-export const baseURL = 'https://melon.invtechnologies.in/'
-// export const baseURL = 'http://192.168.0.101:1538/'
+// export const baseURL = 'https://melon.invtechnologies.in/'
+export const baseURL = 'http://192.168.0.103:1538/'
 
 const api = axios.create({
   baseURL,
   headers: { 'Content-Type': 'application/json', },
 })
 
+api.interceptors.request.use((config) => {
+  const user = LsService.getCurrentUser(); // or from somewhere else
+  if (user?.token) {
+    // Make sure headers exists
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${user.token}`;
+  }
+  return config;
+},
+  (error) => Promise.reject(error)
+);
+
 // login API
 export const login = (data) =>
   api.post('auth/login', data);
 
-// fetch API's
 // dashboard stats
-export const getDashboardStats = () =>
-  api.get('get_dashboard_statastics');
+export const getDashboardStats = (branch_id) =>
+  api.get( `/user/dashboard-stats/${branch_id}`);
+
+// users Apis
+export const getAllUsers = (params) =>
+  api.get('user/fetch-users', { params });
+
+export const createUser = (data) =>
+  api.post('user/create-user', data); // adjust endpoint to yours
+
+export const updateUser = (userId, data) =>
+  api.put(`user/update-user/${userId}`, data); // used for status
+
+export const updateUserPassword = (userId, newPassword) =>
+  api.patch(`user/update-password/${userId}`, {
+    password: newPassword, // or `new_password` if backend expects that
+  });
+
+// ---- BRANCHES ----
+// was getAllStores before – now branches
+export const getAllBranches = (params) =>
+  api.get('branch/fetch-branches', { params }); 
+
+export const updateBranches = (brand_id, data) =>
+  api.put(`/branch/update-branch/${brand_id}`, data)
+
+// brand management APIs
+export const createBrand = (data) =>
+  api.post('brand/create-brand', data)
+
+export const getAllBrands = () =>
+  api.get('brand/fetch-brands')
+
+export const updateBrand = (brand_id, data) =>
+  api.put(`brand/update-brand/${brand_id}`, data)
+
+// product management APIs
+export const createProduct = (data) =>
+  api.post('/product/create-product', data)
+
+export const fetchBySearchMainProducts = (branchId, searchTerm) =>
+  api.get(`product/search-product/${branchId}`, {
+    params: { search: searchTerm },
+  });
+
+export const getAllProducts = (branch_id) =>
+  api.get(`/product/fetch-products/${branch_id}`)
+
+export const updateProduct = (prid, data) =>
+  api.put(`product/update-product/${prid}`, data)
+
+// billing management APIs
+export const billing = (payload) => {
+  return api.post('orders/place-order', payload);
+}
+
+export const fetchByOrderID = (id) =>
+  api.get(`orders/fetch-order-byid/${id}`);
+
+export const getAllOrders = () =>
+  api.get("orders/fetch-orders")
+
+// customer management APIs
+export const getAllCustomers = (params) =>
+  api.get('customers/fetch-customers', { params });
+
+export const fetchBySearchPhone = (phone) =>
+  api.get(`customer/search-customer`, {params: { search: phone }});
+
+export const fetchCustomerOrdersByPhone = (phone) =>
+  api.get(`orders/fetch-customer-orders/${phone}`);
+
+// combos management APIs
+export const addCombo = (data) =>
+  api.post('/combo/create-combo', data)
+
+export const getCombosByBranch = (storeid) =>
+  api.get(`get_store_combos/${storeid}`)
+
+
+
+
+
+
+
+// fetch API's
 
 export const getStoreDashboardStats = (storeid) =>
   api.get(`get_store_dashboard_statastics/${storeid}`)
@@ -40,16 +137,6 @@ export const getAllSuppliers = () =>
 export const updateSupplier = (id, data) =>
   api.put(`update_supplier/${id}`, data)
 
-// brand management APIs
-export const createBrand = (data) =>
-  api.post('brand/create-brand', data)
-
-export const getAllBrands = () =>
-  api.get('/brand/fetch-brands')
-
-export const updateBrand = (id, data) =>
-  api.put(`update_brand/${id}`, data)
-
 // unit management APIs
 export const createUnit = (data) =>
   api.post('create_unit', data)
@@ -70,32 +157,6 @@ export const createStore = (data) =>
 export const updateStore = (id, data) =>
   api.put(`update_store_by_id/${id}`, data)
 
-//user management APIs
-// export const getAllUsers = () =>
-//   api.get('get_all_users');
-
-export const getAllUsers = (params) =>
-  api.get('user/fetch-users', { params });
-
-export const createUser = (data) =>
-  api.post('/user/create-user', data)
-
-export const updateUser = (id, data) =>
-  api.put(`update_user/${id}`, data)
-
-// product management APIs
-export const getAllProducts = (params) =>
-  api.get('/product/fetch-products',{params})
-
-export const createProduct = (data) =>
-  api.post('/product/create-product', data)
-
-export const updateProduct = (barcode, data) =>
-  api.put(`update_product/${barcode}`, data)
-
-export const fetchBySearchMainProducts = (search) =>
-  api.get('search_products', { params: { search } });
-
 // store products management APIs
 export const createStoreProducts = (data) =>
   api.post('crete_store_products', data)
@@ -112,33 +173,18 @@ export const updateRemarks = (id, data) =>
 export const updateConfirm = (id, data) =>
   api.put(`update_confirmed/${id}`, data)
 
-export const  get_store_product_details = (search, store_id) =>
+export const get_store_product_details = (search, store_id) =>
   api.get('get_store_product_details', { params: { search, store_id } })
-
-// combos management APIs
-export const addCombo = (data) =>
-  api.post('create_combo', data)
-
-export const getStoreCombosbyid = (storeid) =>
-  api.get(`get_store_combos/${storeid}`)
 
 // customer management APIs
 export const get_customer_data = async (phone) => {
   return await api.get(`check_customer_purchasing_data/${phone}`);
 };
 
-// billing management APIs
-export const billing =  (payload) => {
-   return api.post('billing', payload);
-}
-
 export const getStoreUsers = (storeid) =>
   api.get(`get_store_users/${storeid}`)
 
-export const getAllOrders = (payload) => 
-  api.post("get_all_orders", payload)
-
-export const getLastOrder = (payload) => 
+export const getLastOrder = (payload) =>
   api.post("get_last_order", payload)
 
 // export const getAllEmployeePaymentData = () =>

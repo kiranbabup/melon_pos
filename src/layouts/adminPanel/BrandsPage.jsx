@@ -1,7 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { createBrand, getAllBrands, updateBrand } from "../../services/api";
-import TableComponent from "../../components/TableComponent";
-import { Box, Button, Switch, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Switch,
+  TextField,
+  Typography,
+  CircularProgress,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TablePagination,
+  TableRow,
+} from "@mui/material";
 import LeftPannel from "../../components/LeftPannel";
 import HeaderPannel from "../../components/HeaderPannel";
 import EditModalComp from "../../components/EditModalComp";
@@ -48,7 +61,6 @@ const BrandsPage = () => {
         ...sup,
         id: index + 1, // sequential table ID
         created_on: sup.created_at?.slice(0, 10),
-        brand: sup.brand_name, // 👈 map brand_name -> brand for the table
       }));
 
       setAllBrands(mappedData);
@@ -66,23 +78,19 @@ const BrandsPage = () => {
       setLoadingBrand(true);
       setBrandMesg("");
       setBrandErrMesg("");
-      // Send state slno and city name
       const response = await createBrand({
         brand_name: brand.trim(),
       });
       // console.log(response);
-      // console.log(response.data);
       if (response.status === 201) {
         setBrand("");
         setBrandMesg(response.data.message);
         fetchBrands();
       } else {
-        // console.error("Failed to add Brand:", response.data.message);
         setBrandErrMesg(response.data.message);
       }
     } catch (error) {
       setBrandErrMesg(error.response.data.message);
-      // console.error("Failed to add Brand:", error.response);
     } finally {
       setLoadingBrand(false);
       setTimeout(() => {
@@ -92,15 +100,12 @@ const BrandsPage = () => {
     }
   };
 
-  const toggleUsageStatus = async (id, currentStatus, brand) => {
+  const toggleUsageStatus = async (id, currentStatus) => {
     try {
       const newStatus = !currentStatus;
       const response = await updateBrand(id, {
         status: newStatus,
-        brand: brand,
       });
-      // console.log(response);
-      // console.log(response.data);
       if (response.status === 200) {
         setBrandMesg(response.data.message);
         fetchBrands();
@@ -124,9 +129,11 @@ const BrandsPage = () => {
     try {
       setLoading(true);
       const response = await updateBrand(editBranSrlno, {
-        brand: editBranValue,
+        brand_name: editBranValue,
         status: true,
       });
+      // console.log(response.data);
+      
       setBrandMesg(response.data.message);
       setEditModalOpen(false);
       fetchBrands();
@@ -143,40 +150,40 @@ const BrandsPage = () => {
   const columns = [
     { field: "id", headerName: "ID", width: 80 },
     { field: "created_on", headerName: "Created On", flex: 1 },
-    { field: "brand", headerName: "Brands Name", width: 180 },
-    // {
-    //   field: "status",
-    //   headerName: "Status",
-    //   flex: 1,
-    //   renderCell: (params) => (
-    //     <Switch
-    //       checked={params.row.status}
-    //       onChange={() =>
-    //         toggleUsageStatus(params.row.brand_id, params.row.status)
-    //       }
-    //       color="primary"
-    //     />
-    //   ),
-    // },
-    // {
-    //   field: "actions",
-    //   headerName: "Actions",
-    //   flex: 1,
-    //   sortable: false,
-    //   renderCell: (params) => (
-    //     <Button
-    //       size="small"
-    //       variant="contained"
-    //       onClick={() => {
-    //         setEditBranValue(params.row.brand);
-    //         setEditBranSrlno(params.row.brand_id);
-    //         setEditModalOpen(true);
-    //       }}
-    //     >
-    //       Edit
-    //     </Button>
-    //   ),
-    // },
+    { field: "brand_name", headerName: "Brands Name", width: 180 },
+    {
+      field: "status",
+      headerName: "Status",
+      flex: 1,
+      renderCell: (params) => (
+        <Switch
+          checked={params.row.status}
+          onChange={() =>
+            toggleUsageStatus(params.row.brand_id, params.row.status)
+          }
+          color="primary"
+        />
+      ),
+    },
+    {
+      field: "actions",
+      headerName: "Actions",
+      flex: 1,
+      sortable: false,
+      renderCell: (params) => (
+        <Button
+          size="small"
+          variant="contained"
+          onClick={() => {
+            setEditBranValue(params.row.brand_name);
+            setEditBranSrlno(params.row.brand_id);
+            setEditModalOpen(true);
+          }}
+        >
+          Edit
+        </Button>
+      ),
+    },
   ];
 
   const onDownloadxl = () => {
@@ -296,15 +303,77 @@ const BrandsPage = () => {
             onClick={onClickModalFinalButton}
             labelName="Edit Brand"
           />
+          <Paper sx={{ overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ backgroundColor: "#0d3679" }}>
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col.field}
+                      sx={{ fontWeight: "bold", color: "white" }}
+                    >
+                      {col.headerName}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : tableData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} align="center">
+                      No data available
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tableData.map((row, index) => (
+                    <TableRow
+                      key={row.id}
+                      sx={{
+                        backgroundColor:
+                          index % 2 === 1 ? "#b3e5ff" : "inherit",
+                        "&:hover": {
+                          backgroundColor: "#87ceeb !important", // sky blue shade
+                          cursor: "pointer",
+                        },
+                      }}
+                    >
+                      {columns.map((col) => (
+                        <TableCell key={col.field}>
+                          {col.renderCell
+                            ? col.renderCell({ row })
+                            : row[col.field]}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
 
-          <TableComponent
-            tableData={tableData}
-            columns={columns}
-            loading={loading}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            rowCount={rowCount}
-          />
+            {/* Pagination */}
+            <TablePagination
+              component="div"
+              count={rowCount}
+              page={paginationModel.page}
+              onPageChange={(_, newPage) =>
+                setPaginationModel((prev) => ({ ...prev, page: newPage }))
+              }
+              rowsPerPage={paginationModel.pageSize}
+              onRowsPerPageChange={(e) =>
+                setPaginationModel({
+                  page: 0,
+                  pageSize: parseInt(e.target.value, 10),
+                })
+              }
+              rowsPerPageOptions={[10, 25, 50, 100]}
+            />
+          </Paper>
         </Box>
       </Box>
     </Box>

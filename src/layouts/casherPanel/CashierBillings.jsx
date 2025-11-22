@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getAllOrders, getAllStores } from "../../../services/api";
+import { getAllOrders } from "../../services/api";
 import {
   Box,
   Typography,
@@ -19,17 +19,18 @@ import {
 } from "@mui/material";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import LsService, { storageKey } from "../../../services/localstorage";
+import LsService, { storageKey } from "../../services/localstorage";
 import TablePagination from "@mui/material/TablePagination";
 import { useNavigate } from "react-router-dom";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
-import { AccentButton } from "../../../data/functions";
+import { AccentButton } from "../../data/functions";
 import "./print.css";
 import billIcon from "./blackLogo.png";
 import { generateReceipt, handlePrint } from "./cashFunctions";
 
 function Row({ order, onPrintReceipt }) {
   const [open, setOpen] = useState(false);
+  console.log(order);
 
   return (
     <>
@@ -40,21 +41,19 @@ function Row({ order, onPrintReceipt }) {
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{order.invoice_number}</TableCell>
+        <TableCell>{order.sno}</TableCell>
+        <TableCell>INV{order.invoice_number}</TableCell>
         <TableCell>
-          {order.customerDetails === null
-            ? "N/A"
-            : order.customerDetails?.customerName}
+          {order.customer_name ? order.customer_name : "N/A"}
         </TableCell>
         <TableCell>
-          {order.customerDetails === null
-            ? order.customerPhone
-            : order.customerDetails?.customerMobile}
+          {order.customer_phone ? order.customer_phone : "N/A"}
         </TableCell>
         <TableCell>
           {order.order_date} {order.order_time}
         </TableCell>
         <TableCell>{order.paymentMethod}</TableCell>
+        <TableCell>₹{order.discount_price}</TableCell>
         <TableCell>₹{order.total}</TableCell>
         <TableCell>{order.user_name}</TableCell>
         <TableCell>
@@ -91,7 +90,7 @@ function Row({ order, onPrintReceipt }) {
                     </TableCell>
                     <TableCell
                       sx={{ color: "white", fontWeight: "bold" }}
-                      align="right"
+                      align="center"
                     >
                       Qty
                     </TableCell>
@@ -107,6 +106,12 @@ function Row({ order, onPrintReceipt }) {
                     >
                       GST
                     </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="center"
+                    >
+                      isCombo
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -114,9 +119,12 @@ function Row({ order, onPrintReceipt }) {
                     <TableRow key={idx}>
                       <TableCell>{item.barcode}</TableCell>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell align="right">{item.quantity}</TableCell>
+                      <TableCell align="center">{item.quantity}</TableCell>
                       <TableCell align="right">₹{item.price}</TableCell>
                       <TableCell align="right">{item.gst}%</TableCell>
+                      <TableCell align="center">
+                        {item.is_combo === true ? "Yes" : "No"}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -131,14 +139,11 @@ function Row({ order, onPrintReceipt }) {
 
 function CashierBillings() {
   const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState(0);
-  const [userId, setUserId] = useState("");
   const [orders, setOrders] = useState([]);
   const [orderMesg, setOrderMesg] = useState("");
   const [orderErrMesg, setOrderErrMesg] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [storeDetails, setStoreDetails] = useState(null);
 
   const paginatedOrders = orders.slice(
     page * rowsPerPage,
@@ -170,41 +175,7 @@ function CashierBillings() {
   }, [orders]);
 
   useEffect(() => {
-    const fetchIds = async () => {
-      try {
-        setLoading(true);
-        const userLoginStatus = LsService.getItem(storageKey);
-        const strId = userLoginStatus.store_id;
-        const usrId = userLoginStatus.user_id;
-        const response = await getAllStores();
-
-        if (strId) {
-          setStoreId(strId);
-          setUserId(usrId);
-          if (response?.data) {
-            // find store by id
-            const selectedStore = response.data.stores.find(
-              (store) => store.store_id === userLoginStatus.store_id
-            );
-
-            if (selectedStore) {
-              setStoreDetails(selectedStore);
-              // console.log("Store Details:", selectedStore);
-            } else {
-              console.log("No store found with this ID");
-            }
-          }
-        } else {
-          setOrderErrMesg("Invalid store_code, no store found");
-        }
-      } catch (error) {
-        console.error("Error fetching stores:", error);
-        setOrderErrMesg("Failed to fetch store details");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchIds();
+    fetchStoreOrders();
 
     fetch(billIcon)
       .then((res) => res.blob())
@@ -220,21 +191,52 @@ function CashierBillings() {
       setOrderMesg("");
       setOrderErrMesg("");
       setLoading(true);
-      const payload = {
-        user_id: userId,
-        store_id: storeId,
-      };
-      // console.log(payload);
 
-      const response = await getAllOrders(payload);
-      // console.log(response);
-      // console.log(response.data.orders);
+      const response = await getAllOrders();
+      console.log(response.data);
 
-      setOrders(response.data.orders.reverse() || []);
+      const apiOrders = response.data.data || [];
 
+      const mappedOrders = apiOrders.map((o, i) => {
+        const orderDateObj = new Date(o.order_date);
+        const orderDateStr = orderDateObj.toISOString().slice(0, 10); // YYYY-MM-DD
+        const orderTimeStr = orderDateObj.toTimeString().slice(0, 5); // HH:MM
+
+        // Map OrderProducts -> cart[]
+        const cart = (o.OrderProducts || []).map((op) => {
+          const prod = Array.isArray(op.Products)
+            ? op.Products[0]
+            : op.Products;
+          return {
+            barcode: prod?.barcode || "N/A",
+            name: prod?.product_name || `#${op.pr_id}`,
+            quantity: op.quantity,
+            price: Number(op.price),
+            gst: Number(prod?.gst || 0),
+            is_combo: !!op.is_combo,
+          };
+        });
+
+        return {
+          ...o,
+          sno: i + 1,
+          cart, // used by Row + onPrintReceipt
+          invoice_number: o.order_id, // use order_id as invoice
+          order_date: orderDateStr,
+          order_time: orderTimeStr,
+          paymentMethod: o.payment_method,
+          total: Number(o.total_amount || 0),
+          user_name: o.user_name || "Cashier", // if you store user name
+        };
+      });
+
+      setOrders(mappedOrders);
       setOrderMesg(response.data.message);
     } catch (error) {
-      setOrderErrMesg(error.response.data.message);
+      console.error(error);
+      setOrderErrMesg(
+        error?.response?.data?.message || "Failed to fetch orders"
+      );
     } finally {
       setLoading(false);
       setTimeout(() => {
@@ -244,39 +246,46 @@ function CashierBillings() {
     }
   };
 
-  useEffect(() => {
-    if (storeId > 0) {
-      fetchStoreOrders();
-    }
-  }, [storeId]);
-
   const onPrintReceipt = (order) => {
     // console.log(order);
+    // Build products array for the receipt from mapped cart[]
+    const products = (order.cart || []).map((item) => ({
+      price: Number(item.price),
+      quantity: item.quantity,
+      product_name: item.name,
+      gst: Number(item.gst || 0),
+    }));
+
+    // Compute total GST from items
+    const totalGstPrice = products
+      .reduce((sum, p) => {
+        const price = p.price || 0;
+        const qty = p.quantity || 0;
+        const gstRate = p.gst || 0;
+        return sum + (price * qty * gstRate) / 100;
+      }, 0)
+      .toFixed(2);
+
     const rePrintPayload = {
-      total_amount: order.total,
+      products,
+      totalGstPrice,
+      total_amount: Number(order.total),
+      discount_price: Number(order.discount_price || 0),
       payment_method: order.paymentMethod,
-      store_id: storeId,
-      products: order.cart.map((item) => ({
-        price: item.price,
-        quantity: item.quantity,
-        product_name: item.name,
-      })),
-      customer_phone: order.customerPhone || "Guest",
+      customer_phone: order.customer_phone || "Guest",
+      customer_name: order.customer_name || "Guest",
     };
-    const customerName =
-      order.customerDetails === null
-        ? "N/A"
-        : order.customerDetails?.customerName;
+
     const receiptContent = generateReceipt(
       rePrintPayload,
       billIconBase64,
-      storeDetails,
-      customerName,
       order.invoice_number,
       order.user_name,
       order.order_date,
-      order.order_time
+      order.order_time,
+      userLoginStatus
     );
+
     handlePrint(receiptContent);
   };
 
@@ -333,7 +342,7 @@ function CashierBillings() {
             sx={{
               background: "linear-gradient(90deg, #4e54c8 0%, #8f94fb 100%)",
             }}
-            onClick={() => navigate("/cashier-panel")}
+            onClick={() => navigate("/cashier_billing_panel")}
           >
             Go to billing
           </AccentButton>
@@ -347,22 +356,37 @@ function CashierBillings() {
           >
             <Box
               sx={{
-                width: 40,
                 height: 40,
                 bgcolor: "#f47920",
                 color: "#fff",
-                borderRadius: "50%",
+                borderRadius: "20px",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                fontWeight: "bold",
-                fontSize: 22,
+                pr: 1,
                 cursor: "pointer",
               }}
               onClick={(e) => handleAvatarClick(e)}
             >
-              {userLoginStatus.role.slice(0, 1).toUpperCase()}
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  bgcolor: "navy",
+                  color: "#fff",
+                  borderRadius: "50%",
+                  border: "3px solid white",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  fontWeight: "bold",
+                  fontSize: 22,
+                }}
+              >
+                {userLoginStatus?.role?.slice(0, 1).toUpperCase()}
+              </Box>
+              {userLoginStatus?.role?.slice(1)}
             </Box>
+
             <Popover
               open={open}
               anchorEl={anchorEl}
@@ -382,11 +406,8 @@ function CashierBillings() {
               <Typography fontWeight="bold" fontSize="1rem" mb={0.5}>
                 {userLoginStatus.username}
               </Typography>
-              <Typography fontSize="0.95rem" color="text.secondary" mb={0.5}>
-                {userLoginStatus.warehouse_code}
-              </Typography>
-              <Typography fontSize="0.95rem" color="text.secondary" mb={0.5}>
-                {userLoginStatus.store_code}
+              <Typography fontWeight="bold" fontSize="1rem" mb={0.5}>
+                {userLoginStatus.email}
               </Typography>
               <Typography fontSize="0.9rem" color="text.secondary" mb={1}>
                 Role: {userLoginStatus.role}
@@ -430,6 +451,9 @@ function CashierBillings() {
                   >
                     <TableCell />
                     <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                      S No
+                    </TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                       Invoice No
                     </TableCell>
                     <TableCell sx={{ color: "white", fontWeight: "bold" }}>
@@ -443,6 +467,9 @@ function CashierBillings() {
                     </TableCell>
                     <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                       Payment
+                    </TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                      Discount
                     </TableCell>
                     <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                       Total

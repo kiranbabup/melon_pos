@@ -1,3 +1,4 @@
+// localStorage.js
 const days = 1;
 export const storageKey = "melon";
 

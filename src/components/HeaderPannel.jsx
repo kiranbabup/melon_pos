@@ -133,9 +133,9 @@ const HeaderPannel = ({ HeaderTitle, tableData, onDownloadCurrentList }) => {
               fontSize: 22,
             }}
           >
-            {userLoginStatus.role.slice(0, 1).toUpperCase()}
+            {userLoginStatus?.role.slice(0, 1).toUpperCase()}
           </Box>
-          {userLoginStatus.role.slice(1)}
+          {userLoginStatus?.role.slice(1)}
         </Box>
         <Popover
           open={open}
@@ -160,7 +160,7 @@ const HeaderPannel = ({ HeaderTitle, tableData, onDownloadCurrentList }) => {
             {userLoginStatus.email}
           </Typography>
           <Typography fontSize="0.95rem" color="text.secondary" mb={0.5}>
-            {userLoginStatus.store_code === 1 && "Super Admin"}
+            {userLoginStatus.branchDetails.name}
           </Typography>
           <Typography fontSize="0.9rem" color="text.secondary" mb={1}>
             Role: {userLoginStatus.role}
@@ -170,7 +170,7 @@ const HeaderPannel = ({ HeaderTitle, tableData, onDownloadCurrentList }) => {
             fullWidth
             variant="text"
             color="error"
-            onClick={onLogoutClick}
+            onClick={()=>onLogoutClick()}
             sx={{
               justifyContent: "flex-start",
               textTransform: "none",

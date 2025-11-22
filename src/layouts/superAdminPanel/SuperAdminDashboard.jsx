@@ -1,3 +1,4 @@
+// Using
 import { Box, Typography } from "@mui/material";
 import LeftPannel from "../../components/LeftPannel";
 import HeaderPannel from "../../components/HeaderPannel";
@@ -8,32 +9,22 @@ import CountCard from "../../components/dashboard_components/CountCard";
 import { getDashboardStats } from "../../services/api";
 import LocalMallIcon from "@mui/icons-material/LocalMall";
 import BrandingWatermarkRoundedIcon from "@mui/icons-material/BrandingWatermarkRounded";
-import CategoryRoundedIcon from "@mui/icons-material/CategoryRounded";
 import TrendingDownRoundedIcon from "@mui/icons-material/TrendingDownRounded";
 import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import BookmarkRemoveIcon from "@mui/icons-material/BookmarkRemove";
 import DangerousIcon from "@mui/icons-material/Dangerous";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
-import StoreIcon from "@mui/icons-material/Store";
 import { useNavigate } from "react-router-dom";
 import LsService, { storageKey } from "../../services/localstorage";
 import { formatToINR } from "../../data/functions";
 
-const COLORS = ["green", "red"];
+// const COLORS = ["green", "red"];
 
 const SuperAdminDashboard = () => {
-  // const [allProduactsCount, setAllProduactsCount] = useState(0);
-  // const [allStores, setAllStores] = useState(0);
   const [counts, setCounts] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    // getAllStores().then(res => {
-    //   console.log(res.data);
-    //   // setAllStores(res.data.products?.length || 0);
-    // })
-    //   .catch(() => setAllStores(0));
-
     getDashboardStats()
       .then((res) => {
         // console.log(res.data);
@@ -45,9 +36,7 @@ const SuperAdminDashboard = () => {
   const user = LsService.getItem(storageKey);
 
   useEffect(() => {
-    // console.log(user);
-
-    if (user.role !== "admin") {
+    if (user.role !== "super_admin") {
       LsService.removeItem(storageKey);
       navigate("/");
     }
@@ -60,12 +49,6 @@ const SuperAdminDashboard = () => {
       Value: counts.totalProducts || 0,
       navpath: "/products",
     },
-    // {
-    //   HeadTitle: "Total Staff",
-    //   IconCompo: SupervisorAccountIcon,
-    //   Value: counts.totalUsers || 0,
-    //   navpath: "/users_management"
-    // },
     {
       HeadTitle: "Total Customers",
       IconCompo: SupervisorAccountIcon,
@@ -78,30 +61,12 @@ const SuperAdminDashboard = () => {
       Value: counts.totalOrders || 0,
       navpath: "/billings",
     },
-    // {
-    //   HeadTitle: "Total Stores",
-    //   IconCompo: StoreIcon,
-    //   Value: counts.totalStores || 0,
-    //   navpath: "/stores"
-    // },
     {
       HeadTitle: "Total Brands",
       IconCompo: BrandingWatermarkRoundedIcon,
       Value: counts.brandsCount || 0,
       navpath: "/brands",
     },
-    {
-      HeadTitle: "Total Categories",
-      IconCompo: CategoryRoundedIcon,
-      Value: counts.categoriesCount || 0,
-      navpath: "/categories",
-    },
-    // {
-    //   HeadTitle: "Total Suppliers",
-    //   IconCompo: SupervisorAccountIcon,
-    //   Value: counts.suppliersCount || 0,
-    //   navpath: "/suppliers"
-    // },
     {
       HeadTitle: "Total Low Stock Products",
       IconCompo: BookmarkRemoveIcon,
@@ -166,10 +131,10 @@ const SuperAdminDashboard = () => {
           ml:1,
         }}
       >
-        <LeftPannel HeaderTitle="Super Admin" />
+        <LeftPannel HeaderTitle="INV Technologies" />
       </Box>
       <Box sx={{ minWidth: "calc( 99vw - 18vw)", ml: 1.5 }}>
-        <HeaderPannel HeaderTitle="Super Admin Dashboard" />
+        <HeaderPannel HeaderTitle="INV Super Admin Dashboard" />
 
         {/* Body starts here */}
         <Box sx={{ width: "99%", mb: 4 }}>

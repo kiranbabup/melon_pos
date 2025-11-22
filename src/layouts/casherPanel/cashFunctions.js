@@ -1,14 +1,14 @@
-import "../../../App.css"
+import "../../App.css"
 
-export const generateReceipt = (billingData, billIconBase64, storeDetails, customerName, invoiceNumber, cashier_name, date, time) => {
+export const generateReceipt = (billingData, billIconBase64, invoiceNumber, cashier_name, date, time, loginUserData) => {
   // console.log(billingData);
   // console.log(billingData.products);
   // console.log(storeDetails);
   // const address = "kkmart, Akkayyapalem, Visakhapatnam, Andhra Pradesh 530016";
   const totalQuantity = billingData.products.reduce(
-  (sum, item) => sum + item.quantity,
-  0
-);
+    (sum, item) => sum + item.quantity,
+    0
+  );
   return `
     <div style="font-family: monospace; width: 300px; margin: 0 auto; padding: 8;">
       <div style="display: flex; flex-direction: column; align-items: center;">
@@ -16,13 +16,13 @@ export const generateReceipt = (billingData, billIconBase64, storeDetails, custo
         <div style="width: 100%;">
           <hr style="border-bottom: 1px dashed #000;">
         </div>
-        <p style="font-size: 12px; margin: 0; padding: 0;">GSTIN: 37ABCF8935H1ZZ</p>
+        <p style="font-size: 12px; margin: 0; padding: 0;">GSTIN: -----N/A----- </p>
         <div style="width: 100%;">
           <hr style="border-bottom: 1px dashed #000;">
         </div>
-        <h3 style="margin: 0; padding: 0;">${storeDetails.name}</h3>
-        <h4 style="text-align: center;">${storeDetails.address}</h4>
-        <h4 style="margin: 0; padding: 0;">Melon Family Salon Phone: ${storeDetails.phone}</h4>
+        <h3 style="margin: 0; padding: 0;">${loginUserData.branchDetails.name}</h3>
+        <h4 style="text-align: center; margin: 0; padding: 0;">${loginUserData.branchDetails.address}</h4>
+        <h4 style="margin: 0; padding: 0;">Phone: ${loginUserData.branchDetails.phone}</h4>
         <div style="width: 100%;">
           <hr style="border-bottom: 1px dashed #000;">
         </div>
@@ -31,11 +31,11 @@ export const generateReceipt = (billingData, billIconBase64, storeDetails, custo
 
       <hr style="border-bottom: 1px dashed #000;">
       
-      <h3 style="text-align: center">TAX INVOICE</h3>
+      <h3 style="text-align: center; margin: 0; padding: 0;">TAX INVOICE</h3>
 
-      <div style="display: flex; justify-content: space-between; font-size: 12px;">
+      <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 0; padding: 0;">
         <span>Customer Name: </span>
-        <span>${customerName || 'Guest'}</span>
+        <span>${billingData.customer_name || 'Guest'}</span>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 12px;">
         <span>Customer Number: </span>
@@ -43,11 +43,11 @@ export const generateReceipt = (billingData, billIconBase64, storeDetails, custo
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 12px;">
         <span>Invoice Number: </span>
-        <span>${invoiceNumber === "" ? "Preview Mode" : invoiceNumber}</span>
+        <span>INV${invoiceNumber === "" ? "Preview Mode" : invoiceNumber}</span>
       </div>
       <div style="display: flex; justify-content: space-between; font-size: 12px;">
         <span>Cashier Name: </span>
-        <span>${cashier_name.slice(0,6) || 'Guest'}</span>
+        <span>${cashier_name.slice(0, 6) || 'Guest'}</span>
       </div>
       <hr style="border-bottom: 1px dashed #000; margin: 10px 0;">
 
@@ -74,7 +74,11 @@ export const generateReceipt = (billingData, billIconBase64, storeDetails, custo
         `).join('')}
       </div>
       <hr style="border-bottom: 1px dashed #000; margin: 10px 0;">
-        <span>Total GST: ₹${billingData.totalGstPrice}</span>
+      <span>Total inclusive GST: ₹${billingData.totalGstPrice}</span>
+      <div style="display: flex; justify-content: space-between; font-size: 14px;">
+        <span>Total Bill Discount:</span>
+        <span>-₹${billingData.discount_price.toFixed(2)}</span>
+      </div>
       <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold;">
         <span>Total Bill Amount:</span>
         <span>₹${billingData.total_amount.toFixed(2)}</span>
@@ -89,15 +93,18 @@ export const generateReceipt = (billingData, billIconBase64, storeDetails, custo
       <hr style="border-bottom: 1px dashed #000; margin: 10px 0;">
       <p style="text-align: center; font-size: 10px; margin: 0;"><------ Amount Received From Customer ------></p>
       <hr style="border-bottom: 1px dashed #000; margin: 10px 0;">
-      <p style="text-align: center; font-size: 10px; margin: 0;">Thank you for shopping with us!</p>
+      <p style="text-align: center; font-size: 10px; margin: 0;">Thank you! Visit us again!</p>
       <p style="text-align: left; font-size: 10px; margin-top: 20px;">"This is a computer generated invoice."</p>
     </div>
   `;
 };
 
 // Function to trigger printing
-export const handlePrint = (receiptData) => {
-  const printWindow = window.open('', '', 'width=350'); // no height restriction
+// cashFunctions.js
+export const handlePrint = (receiptData, externalWindow) => {
+  // if externalWindow is passed, use that. Otherwise open a new one (for preview button).
+  const printWindow = externalWindow || window.open('', '', 'width=350');
+
   printWindow.document.write(`
     <html>
       <head>
@@ -105,8 +112,8 @@ export const handlePrint = (receiptData) => {
         <style>
           @media print {
             @page {
-              size: auto;   /* shrink page to content height */
-              margin: 0;    /* no browser default margins */
+              size: auto;
+              margin: 0;
               padding: 0;
             }
             body {
@@ -131,10 +138,9 @@ export const handlePrint = (receiptData) => {
   `);
   printWindow.document.close();
 
-  // wait for content before printing
   printWindow.onload = () => {
     printWindow.focus();
     printWindow.print();
-    printWindow.close(); // auto close after printing
+    printWindow.close();
   };
 };

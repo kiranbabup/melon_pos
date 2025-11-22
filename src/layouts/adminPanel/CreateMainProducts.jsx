@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import LeftPannel from "../../components/LeftPannel";
 import HeaderPannel from "../../components/HeaderPannel";
+import LsService, { storageKey } from "../../services/localstorage";
 
 function CreateMainProducts() {
   const [loading, setLoading] = useState(false);
@@ -53,6 +54,7 @@ function CreateMainProducts() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+  const userDetails = LsService.getItem(storageKey);
 
   const handleCreateProduct = async () => {
     try {
@@ -64,20 +66,22 @@ function CreateMainProducts() {
       const isService = Number(formData.category_id) === 2; // 1 = Product, 2 = Service
 
       const payload = {
+        branch_id: userDetails.branch_id,
         category_id: Number(formData.category_id),
-        brand_id: Number(formData.brand_id),
         product_name: formData.product_name,
         mrp_price: Number(formData.product_price),
         discount_price: Number(formData.discount_price),
         quantity: Number(formData.quantity),
         qty_alert: Number(formData.qty_alert),
+
+        brand_id: Number(formData.brand_id),
         is_product: isService ? 0 : 1, // <-- see note below
-        barcode: isService ? null : Number(formData.barcode) || null,
+        barcode: isService ? null : Number(formData.barcode),
 
         description: formData.product_description || "",
         gst: formData.gst ? Number(formData.gst) : 0,
-        manufacturing_date: formData.manufacturing_date || null,
-        expiry_date: formData.expiry_date || null,
+        manufacturing_date: isService ? null : formData.manufacturing_date,
+        expiry_date: isService ? null : formData.expiry_date,
       };
       // console.log(payload);
 
@@ -162,16 +166,48 @@ function CreateMainProducts() {
             }}
           >
             <Grid container spacing={2}>
-              {/* String Fields */}
               <Grid item size={6}>
-                <TextField
-                  fullWidth
-                  label="Barcode (Manual input or use Scanner)"
-                  name="barcode"
-                  value={formData.barcode}
-                  onChange={handleChange}
-                  disabled={loading || Number(formData.category_id) === 2}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    name="category_id"
+                    value={formData.category_id}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    <MenuItem value="1">Product</MenuItem>
+                    <MenuItem value="2">Service</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {Number(formData.category_id) === 1 && (
+                <Grid item size={6}>
+                  <TextField
+                    fullWidth
+                    label="Barcode (Manual input or use Scanner)"
+                    name="barcode"
+                    value={formData.barcode}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+                </Grid>
+              )}
+              <Grid item size={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Brand</InputLabel>
+                  <Select
+                    name="brand_id"
+                    value={formData.brand_id}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    {brands.map((b) => (
+                      <MenuItem key={b.brand_id} value={b.brand_id}>
+                        {b.brand_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item size={6}>
                 <TextField
@@ -224,31 +260,34 @@ function CreateMainProducts() {
                       disabled={loading}
                     />
                   </Grid>
-                  <Grid item size={6}>
-                    <TextField
-                      fullWidth
-                      label="Quantity"
-                      name="quantity"
-                      type="number"
-                      inputProps={{ min: 1 }}
-                      value={formData.quantity}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                  </Grid>
-
-                  <Grid item size={6}>
-                    <TextField
-                      fullWidth
-                      label="Quantity Alert"
-                      name="qty_alert"
-                      type="number"
-                      inputProps={{ min: 1 }}
-                      value={formData.qty_alert}
-                      onChange={handleChange}
-                      disabled={loading}
-                    />
-                  </Grid>
+                  {Number(formData.category_id) === 1 && (
+                    <Grid item size={6}>
+                      <TextField
+                        fullWidth
+                        label="Quantity"
+                        name="quantity"
+                        type="number"
+                        inputProps={{ min: 1 }}
+                        value={formData.quantity}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </Grid>
+                  )}
+                  {Number(formData.category_id) === 1 && (
+                    <Grid item size={6}>
+                      <TextField
+                        fullWidth
+                        label="Quantity Alert"
+                        name="qty_alert"
+                        type="number"
+                        inputProps={{ min: 1 }}
+                        value={formData.qty_alert}
+                        onChange={handleChange}
+                        disabled={loading}
+                      />
+                    </Grid>
+                  )}
                 </Grid>
 
                 {/* TextArea */}
@@ -267,68 +306,38 @@ function CreateMainProducts() {
               </Grid>
               {/* Dropdowns */}
 
-              <Grid item size={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Category</InputLabel>
-                  <Select
-                    name="category_id"
-                    value={formData.category_id}
-                    onChange={handleChange}
-                    disabled={loading}
-                  >
-                    <MenuItem value="1">Product</MenuItem>
-                    <MenuItem value="2">Service</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item size={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Brand</InputLabel>
-                  <Select
-                    name="brand_id"
-                    value={formData.brand_id}
-                    onChange={handleChange}
-                    disabled={loading}
-                  >
-                    {brands.map((b) => (
-                      <MenuItem key={b.brand_id} value={b.brand_id}>
-                        {b.brand_name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
               {/* Dates */}
-              <Grid item size={6}>
-                <TextField
-                  fullWidth
-                  label="Manufacturing Date"
-                  name="manufacturing_date"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  value={formData.manufacturing_date}
-                  onChange={handleChange}
-                  disabled={loading}
-                />
-              </Grid>
-
-              <Grid item size={6}>
-                <TextField
-                  fullWidth
-                  label="Expiry Date"
-                  name="expiry_date"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  value={formData.expiry_date}
-                  onChange={handleChange}
-                  disabled={!formData.manufacturing_date || loading}
-                  inputProps={{
-                    min: formData.manufacturing_date || undefined,
-                  }}
-                />
-              </Grid>
+              {Number(formData.category_id) === 1 && (
+                <Grid item size={6}>
+                  <TextField
+                    fullWidth
+                    label="Manufacturing Date"
+                    name="manufacturing_date"
+                    type="date"
+                    InputLabelProps={{ shrink: true }}
+                    value={formData.manufacturing_date}
+                    onChange={handleChange}
+                    disabled={loading}
+                  />
+                </Grid>
+              )}
+              {Number(formData.category_id) === 1 && (
+                <Grid item size={6}>
+                  <TextField
+                    fullWidth
+                    label="Expiry Date"
+                    name="expiry_date"
+                    type="date"
+                    InputLabelProps={{ shrink: true }}
+                    value={formData.expiry_date}
+                    onChange={handleChange}
+                    disabled={!formData.manufacturing_date || loading}
+                    inputProps={{
+                      min: formData.manufacturing_date || undefined,
+                    }}
+                  />
+                </Grid>
+              )}
             </Grid>
             <Box
               sx={{

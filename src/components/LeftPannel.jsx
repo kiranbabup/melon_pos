@@ -41,25 +41,27 @@ const LeftPannel = ({ HeaderTitle }) => {
 
   // Map navItems to icons
   const navIcons = {
-    "/super-admin": <DashboardIcon />,
-    "/warehouse-admin": <DashboardIcon />,
+    "/super_admin": <DashboardIcon />,
+    "/admin_panel": <DashboardIcon />,
+    "/manage_branches": <FactoryIcon />,
+    "/manage_clients": <GroupIcon />,
+    "/manage_customers": <GroupIcon />,
+
     "/store-manager": <DashboardIcon />,
     "/categories": <CategoryIcon />,
     "//suppliers": <BusinessIcon />,
     "/units": <ClassIcon />,
-    "/stores": <FactoryIcon />,
     "/brands": <AssignmentTurnedInIcon />,
-    "/users_management": <GroupIcon />,
-    "/products": <ShoppingBasketIcon />,
+    "/inventory": <ShoppingBasketIcon />,
     "/add-to-main": <AddShoppingCartIcon />,
     "/add-store-products": <AddShoppingCartIcon />,
     "/store-pendings": <ProductionQuantityLimitsIcon />,
     "/store-recived-products": <ShoppingBagIcon />,
     "/inventory-by-store": <Inventory2TwoToneIcon />,
     "/confirm-store-inventory": <InventoryTwoToneIcon />,
-    "/add-store-combos": <WorkspacesIcon />,
+    "/create-combos": <WorkspacesIcon />,
     "/store-inventory": <ShoppingCartIcon />,
-    "/billings": <ReceiptLongIcon />,
+    "/branch-billings": <ReceiptLongIcon />,
     "/store-billings": <ReceiptLongIcon />,
     "/display-combos": <ShoppingCartIcon />,
   };
@@ -69,28 +71,53 @@ const LeftPannel = ({ HeaderTitle }) => {
     {
       title: "Main",
       items: [
-        { label: "Dashboard", route: "/super-admin" },
+        { label: "Dashboard", route: "/super_admin" },
+        { label: "Manage Clients", route: "/manage_clients" },
+        { label: "Manage Branches", route: "/manage_branches" },
         // { label: "Billings", route: "/billings" },
-        { label: "Manage Users", route: "/users_management" },
+        // { label: "Inventory", route: "/products" },
+        // { label: "Brands", route: "/brands" },
+        //
       ],
     },
+    // {
+    //   title: "Create",
+    //   items: [
+    //     { label: "Add Inventory", route: "/add-to-main" },
+    //     { label: "Add Combos", route: "/add-store-combos" },
+    //   ],
+    // },
+  ];
+  const adminPanelSections = [
     {
-      title: "Management",
+      title: "Main",
       items: [
+        { label: "Dashboard", route: "/admin_panel" },
+        { label: "Billings", route: "/branch-billings" },
+        { label: "Customers", route: "/manage_customers" },
         { label: "Brands", route: "/brands" },
-        { label: "Main Inventory", route: "/products" },
-        { label: "Create Main Products", route: "/add-to-main" },
-        // { label: "Add Store Combos", route: "/add-store-combos" },
-        // { label: "View Combos", route: "/display-combos" },
+        { label: "Add Inventory", route: "/add-to-main" },
+        { label: "Inventory", route: "/inventory" },
+        { label: "Add Combos", route: "/create-combos" },
+        { label: "Combos Inventory", route: "/display-combos" },
+        //
+        // { label: "Manage Users", route: "/users_management" },
       ],
     },
+    // {
+    //   title: "Create",
+    //   items: [
+    //   ],
+    // },
   ];
 
   useEffect(() => {
     // console.log(user);
     if (user) {
-      if (user.role === "admin") {
+      if (user.role === "super_admin") {
         setSections(superAdminSections);
+      } else if (user.role === "admin"){
+        setSections(adminPanelSections);
       }
     } else {
       return;
@@ -115,8 +142,10 @@ const LeftPannel = ({ HeaderTitle }) => {
   }, [location.pathname, sections]);
 
   const onHandleNav = () => {
-    if (user.role === "admin") {
-      navigate("/super-admin");
+    if (user.role === "super_admin") {
+      navigate("/super_admin");
+    }else if (user.role === "admin") {
+      navigate("/admin_panel");
     } else {
       navigate("/login");
     }
@@ -129,7 +158,7 @@ const LeftPannel = ({ HeaderTitle }) => {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent:"start",
+        justifyContent: "start",
         gap: 2,
       }}
     >
@@ -177,7 +206,7 @@ const LeftPannel = ({ HeaderTitle }) => {
         }}
       >
         {sections.map((section, idx) => (
-          <Box key={section.title} sx={{ width: "100%", mb: 1, }}>
+          <Box key={section.title} sx={{ width: "100%", mb: 1 }}>
             <Box
               sx={{
                 display: "flex",
@@ -217,7 +246,7 @@ const LeftPannel = ({ HeaderTitle }) => {
                       borderRadius: 2,
                       my: 0.5,
                       bgcolor: isActiveRoute(item.route)
-                        ? "#f4f4f5"
+                        ? "#87ceeb"
                         : "transparent",
                     }}
                   >

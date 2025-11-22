@@ -25,8 +25,9 @@ export const GlassCard = styled(Card)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
   minWidth: 0,
-  minHeight: 0,
+  // minHeight: 0,
   flex: 1,
+  height:"100%"
 }));
 
 export const AccentButton = styled(Button)(({ theme }) => ({
