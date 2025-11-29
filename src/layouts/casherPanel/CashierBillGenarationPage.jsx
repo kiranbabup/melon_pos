@@ -24,7 +24,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import {
   fetchBySearchMainProducts,
   fetchBySearchPhone,
-  billing,
+  billOrder,
   fetchByOrderID,
 } from "../../services/api";
 import LsService, { storageKey } from "../../services/localstorage";
@@ -116,13 +116,13 @@ const CashierBillGenarationPage = () => {
         trimmedSearch
       );
 
-      console.log(res.data);
+      // console.log(res.data);
 
       const prods = res.data.products || [];
       setProducts(
         prods.map((prod) => ({
           ...prod,
-          mrp_price: Number(prod.mrp_price),
+          mrp_price: Number(prod.product_price),
           discount_price: Number(prod.discount_price),
         }))
       );
@@ -152,12 +152,14 @@ const CashierBillGenarationPage = () => {
 
   // Add product to cart
   const handleAddToCart = (product) => {
-    console.log(product);
+    // console.log(product);
 
-    const isService = Number(product.category_id) === 2; // 👈 service flag
+    const isService = Number(product.category_id) === 2; // service flag
+    const isCombo = !!product.is_combo;
+    const isUnlimited = isService || isCombo; // 👈 treat combos same as services
 
     // For normal products only → block if out of stock
-    if (!isService && product.quantity <= 0) {
+    if (!isUnlimited && product.quantity <= 0) {
       showSnackbar(
         "error",
         "Sorry you can not buy this product due to out of stock."
@@ -169,16 +171,20 @@ const CashierBillGenarationPage = () => {
       const exists = prev.find((item) => item.pr_id === product.pr_id);
 
       if (exists) {
-        if (product.is_combo) {
-          return prev;
+        // Unlimited types (service/combo): just increase quantity
+        if (isUnlimited) {
+          return prev.map((item) =>
+            item.pr_id === product.pr_id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
         }
 
         // Normal products: cap at available quantity
-        if (!isService && exists.quantity >= product.quantity) {
+        if (exists.quantity >= (product.quantity ?? exists.quantity)) {
           return prev;
         }
 
-        // Services: no stock check, just increase quantity
         return prev.map((item) =>
           item.pr_id === product.pr_id
             ? { ...item, quantity: item.quantity + 1 }
@@ -192,11 +198,9 @@ const CashierBillGenarationPage = () => {
         {
           ...product,
           quantity: 1,
-          // For services, give a very large available qty so other code never blocks it
-          quantity_available: isService
+          // For services & combos, give a very large available qty
+          quantity_available: isUnlimited
             ? Number.MAX_SAFE_INTEGER
-            : product.is_combo
-            ? 1
             : product.quantity,
         },
       ];
@@ -219,6 +223,40 @@ const CashierBillGenarationPage = () => {
     }
     return false;
   };
+
+  const sortedCart = useMemo(() => {
+    const typeRank = (item) => {
+      const cat = Number(item.category_id);
+      const isCombo = !!item.is_combo;
+
+      // Combos last
+      if (isCombo) return 2;
+
+      // Products first
+      if (cat === 1) return 0;
+
+      // Services next (category_id = 2, not combo)
+      if (cat === 2) return 1;
+
+      // Anything else (fallback)
+      return 3;
+    };
+
+    return [...cart].sort((a, b) => {
+      const ta = typeRank(a);
+      const tb = typeRank(b);
+
+      if (ta !== tb) return ta - tb;
+
+      // Secondary sort inside the same group (optional)
+      // by pr_id or name so it stays consistent
+      if (a.pr_id && b.pr_id) {
+        return a.pr_id - b.pr_id;
+      }
+
+      return (a.product_name || "").localeCompare(b.product_name || "");
+    });
+  }, [cart]);
 
   const handleQtyChange = (id, delta) => {
     setCart((prev) =>
@@ -275,7 +313,7 @@ const CashierBillGenarationPage = () => {
   const fetchCustomerByMobile = async (phone) => {
     try {
       const res = await fetchBySearchPhone(phone);
-      console.log(res.data);
+      // console.log(res.data);
 
       const cust = res.data.data;
       if (cust && cust.customer_name) {
@@ -330,7 +368,7 @@ const CashierBillGenarationPage = () => {
   const grandTotal = Math.max(effectiveBaseTotal - discountAmount, 0);
 
   const handleBillingSubmit = async () => {
-    console.log("Cart before billing:", cart);
+    // console.log("Cart before billing:", cart);
 
     // 👉 Open print window immediately on user click (so popup is allowed)
     const printWindowRef = window.open("", "", "width=350");
@@ -340,6 +378,7 @@ const CashierBillGenarationPage = () => {
       pr_id: item.pr_id,
       quantity: item.quantity,
       price: Number(item.discount_price),
+      is_combo: item.is_combo,
     }));
 
     // 2️⃣ Payload for /billing
@@ -364,16 +403,16 @@ const CashierBillGenarationPage = () => {
       setSubmitLoading(true);
 
       // 3️⃣ Call billing API
-      const resp = await billing(payload);
-      console.log("bill resp:", resp.data);
+      const resp = await billOrder(payload);
+      // console.log("bill resp:", resp.data);
 
       if (resp.status === 201) {
         const orderID = resp.data.data;
-        console.log("Created orderID:", orderID);
+        // console.log("Created orderID:", orderID);
 
         // 4️⃣ Fetch full order details using orderID
         const orderResp = await fetchByOrderID(orderID);
-        console.log("orderResp:", orderResp.data);
+        // console.log("orderResp:", orderResp.data);
 
         const order = orderResp.data.data;
         if (!order) {
@@ -382,20 +421,89 @@ const CashierBillGenarationPage = () => {
           return;
         }
 
-        // 5️⃣ Map OrderProducts -> products array for the receipt
-        const receiptProducts = (order.OrderProducts || []).map((op) => {
+        // 5️⃣ Build receipt items: aggregate PRODUCTS and COMBOS separately
+        const comboMap = new Map();
+        const productMap = new Map();
+
+        (order.OrderProducts || []).forEach((op) => {
+          // 👉 COMBO LINES
+          if (op.ComboProduct) {
+            const cp = op.ComboProduct;
+            const comboId = cp.combo_id;
+            const comboMeta = cp.Combo || {};
+
+            // if we've already processed this combo_id once, ignore duplicates
+            if (comboMap.has(comboId)) return;
+
+            const lineQty = Number(op.quantity || 0); // quantity of this combo purchased
+            const comboName = comboMeta.combo_name || `Combo #${comboId}`;
+            const comboPrice = Number(comboMeta.combo_price || 0); // price per combo
+            const comboGst = Number(comboMeta.combo_gst || 0);
+
+            comboMap.set(comboId, {
+              combo_id: comboId,
+              product_name: comboName,
+              quantity: lineQty,
+              price: comboPrice,
+              gst: comboGst,
+              is_combo: true,
+            });
+
+            return;
+          }
+
+          // 👉 NORMAL PRODUCT LINES
           const prod = Array.isArray(op.Products)
             ? op.Products[0]
             : op.Products;
-          const productName = prod?.product_name || `#${op.pr_id}`;
-          const gst = prod?.gst ?? 0;
+          if (!prod) return;
 
-          return {
-            price: Number(op.price),
-            quantity: op.quantity,
-            product_name: productName,
-            gst: gst,
-          };
+          const prId = prod.pr_id;
+          const lineQty = Number(op.quantity || 0);
+          const linePrice = Number(prod.discount_price || op.price || 0);
+          const gst = Number(prod.gst || 0);
+
+          let entry = productMap.get(prId);
+          if (!entry) {
+            entry = {
+              product_name: prod.product_name || `#${prId}`,
+              quantity: 0,
+              totalPrice: 0,
+              gst,
+              is_combo: false,
+            };
+          }
+
+          entry.quantity += lineQty;
+          entry.totalPrice += lineQty * linePrice;
+
+          productMap.set(prId, entry);
+        });
+
+        // 👉 Flatten into a single array for the receipt
+        const receiptProducts = [];
+
+        // First: normal products (grouped by product)
+        productMap.forEach((p) => {
+          const unitPrice = p.quantity ? p.totalPrice / p.quantity : 0;
+          receiptProducts.push({
+            price: unitPrice,
+            quantity: p.quantity,
+            product_name: p.product_name,
+            gst: p.gst,
+            is_combo: false,
+          });
+        });
+
+        // Then: combos (one line per combo_id, using only the first occurrence)
+        comboMap.forEach((c) => {
+          receiptProducts.push({
+            price: c.price, // Combo.Combo.combo_price
+            quantity: c.quantity, // op.quantity from first row
+            product_name: c.product_name, // Combo.Combo.combo_name
+            gst: c.gst, // Combo.Combo.combo_gst
+            is_combo: true,
+          });
         });
 
         // 6️⃣ Compute GST total from order items
@@ -415,7 +523,7 @@ const CashierBillGenarationPage = () => {
         const orderDateObj = new Date(order.order_date);
         const orderDateStr = orderDateObj.toISOString().slice(0, 10);
         const orderTimeStr = orderDateObj.toTimeString().slice(0, 5);
-
+        const invoiceName ="TAX INVOICE";
         const receiptPayload = {
           products: receiptProducts,
           totalGstPrice: totalGstFromOrder,
@@ -433,7 +541,8 @@ const CashierBillGenarationPage = () => {
           cashier_name,
           orderDateStr,
           orderTimeStr,
-          userLoginStatus
+          userLoginStatus,
+          invoiceName
         );
 
         // 8️⃣ Print & UI updates (no setTimeout needed)
@@ -756,7 +865,7 @@ const CashierBillGenarationPage = () => {
                 No items in cart.
               </Box>
             ) : (
-              cart.map((item, idx) => (
+              sortedCart.map((item, idx) => (
                 <Box
                   key={item.pr_id}
                   sx={{
@@ -840,16 +949,15 @@ const CashierBillGenarationPage = () => {
                       py: 0.5,
                     }}
                   >
-                    {/* "-" button: disabled for combo */}
+                    {/* "-" button: allow for all types */}
                     <IconButton
                       size="small"
                       onClick={() => handleQtyChange(item.pr_id, -1)}
                       sx={{ p: 0.5, minWidth: 24 }}
-                      disabled={item.is_combo}
                     >
                       <RemoveIcon fontSize="small" />
                     </IconButton>
-                    {/* Quantity display */}
+
                     <Typography
                       sx={{
                         mx: 0.5,
@@ -862,20 +970,21 @@ const CashierBillGenarationPage = () => {
                     >
                       {item.quantity}
                     </Typography>
-                    {/* "+" button: disabled for combo and when at max */}
+
+                    {/* "+" button: only blocked when hitting available quantity */}
                     <IconButton
                       size="small"
                       onClick={() => handleQtyChange(item.pr_id, 1)}
                       sx={{ p: 0.5, minWidth: 24 }}
                       disabled={
-                        item.is_combo ||
                         item.quantity >=
-                          (item.quantity_available ?? item.quantity)
+                        (item.quantity_available ?? item.quantity)
                       }
                     >
                       <AddIcon fontSize="small" />
                     </IconButton>
                   </Box>
+
                   {/* Total */}
                   <Box sx={{ width: 90, textAlign: "center", fontWeight: 600 }}>
                     ₹

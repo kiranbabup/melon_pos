@@ -3,10 +3,6 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Paper,
   Table,
   TableBody,
@@ -24,45 +20,42 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import TablePagination from "@mui/material/TablePagination";
 import * as XLSX from "xlsx";
-import { getAllOrders } from "../../services/api";
+import { getCombosByBranch } from "../../services/api";
+import LsService, { storageKey } from "../../services/localstorage";
 
-function Row({ order, onPrintReceipt }) {
+function Row({ combo }) {
   const [open, setOpen] = useState(false);
-//   console.log(order);
 
   return (
     <>
-      {/* Parent Row = Order */}
+      {/* Parent Row = Combo */}
       <TableRow>
         <TableCell>
           <IconButton size="small" onClick={() => setOpen(!open)}>
             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
           </IconButton>
         </TableCell>
-        <TableCell>{order.sno}</TableCell>
-        <TableCell>INV{order.invoice_number}</TableCell>
+        <TableCell>{combo.sno}</TableCell>
+        <TableCell>{combo.combo_id}</TableCell>
+        <TableCell>{combo.combo_name}</TableCell>
         <TableCell>
-          {order.customer_name ? order.customer_name : "N/A"}
+          {combo.is_product ? "Product Combo" : "Service Combo"}
         </TableCell>
+        <TableCell>₹{combo.combo_price.toFixed(2)}</TableCell>
+        <TableCell>{combo.combo_gst}%</TableCell>
         <TableCell>
-          {order.customer_phone ? order.customer_phone : "N/A"}
+          {combo.created_date} {combo.created_time}
         </TableCell>
-        <TableCell>
-          {order.order_date} {order.order_time}
-        </TableCell>
-        <TableCell>{order.paymentMethod}</TableCell>
-        <TableCell>₹{order.discount_price}</TableCell>
-        <TableCell>₹{order.total}</TableCell>
-        <TableCell>{order.user_name}</TableCell>
+        <TableCell>{combo.status ? "Active" : "Inactive"}</TableCell>
       </TableRow>
 
-      {/* Collapsible Child Row = Cart Items */}
+      {/* Collapsible Child Row = Items inside combo */}
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box margin={1}>
               <Typography variant="h6" gutterBottom>
-                Cart Items
+                Combo Items
               </Typography>
               <Table size="small">
                 <TableHead>
@@ -81,7 +74,7 @@ function Row({ order, onPrintReceipt }) {
                       sx={{ color: "white", fontWeight: "bold" }}
                       align="center"
                     >
-                      Qty
+                      Type
                     </TableCell>
                     <TableCell
                       sx={{ color: "white", fontWeight: "bold" }}
@@ -95,25 +88,16 @@ function Row({ order, onPrintReceipt }) {
                     >
                       GST
                     </TableCell>
-                    <TableCell
-                      sx={{ color: "white", fontWeight: "bold" }}
-                      align="center"
-                    >
-                      isCombo
-                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {order.cart?.map((item, idx) => (
+                  {combo.items?.map((item, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{item.barcode}</TableCell>
                       <TableCell>{item.name}</TableCell>
-                      <TableCell align="center">{item.quantity}</TableCell>
+                      <TableCell align="center">{item.category}</TableCell>
                       <TableCell align="right">₹{item.price}</TableCell>
                       <TableCell align="right">{item.gst}%</TableCell>
-                      <TableCell align="center">
-                        {item.is_combo === true ? "Yes" : "No"}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -131,6 +115,7 @@ function DisplayCombosTable() {
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const userLoginStatus = LsService.getItem(storageKey);
 
   const paginatedOrders = orders.slice(
     page * rowsPerPage,
@@ -153,48 +138,49 @@ function DisplayCombosTable() {
     try {
       setLoading(true);
 
-      const response = await getAllOrders();
-      console.log(response.data);
+      const response = await getCombosByBranch(userLoginStatus.branch_id);
+      // console.log(response.data);
 
-      const apiOrders = response.data.data || [];
+      const apiCombos = response.data.data || [];
 
-      const mappedOrders = apiOrders.map((o, i) => {
-        const orderDateObj = new Date(o.order_date);
-        const orderDateStr = orderDateObj.toISOString().slice(0, 10); // YYYY-MM-DD
-        const orderTimeStr = orderDateObj.toTimeString().slice(0, 5); // HH:MM
+      const mappedCombos = apiCombos.map((c, i) => {
+        const createdAt = new Date(c.created_at);
+        const createdDate = createdAt.toISOString().slice(0, 10); // YYYY-MM-DD
+        const createdTime = createdAt.toTimeString().slice(0, 5); // HH:MM
 
-        // Map OrderProducts -> cart[]
-        const cart = (o.OrderProducts || []).map((op) => {
-          const prod = Array.isArray(op.Products)
-            ? op.Products[0]
-            : op.Products;
+        const items = (c.ComboProducts || []).map((cp) => {
+          const p = cp.Product || {};
           return {
-            barcode: prod?.barcode || "N/A",
-            name: prod?.product_name || `#${op.pr_id}`,
-            quantity: op.quantity,
-            price: Number(op.price),
-            gst: Number(prod?.gst || 0),
-            is_combo: !!op.is_combo,
+            barcode: p.barcode || "N/A",
+            name: p.product_name || `#${cp.pr_id}`,
+            price: Number(cp.price), // combo component price
+            gst: Number(p.gst || c.combo_gst || 0),
+            category:
+              Number(p.category_id) === 1
+                ? "Product"
+                : Number(p.category_id) === 2
+                ? "Service"
+                : "Other",
           };
         });
 
         return {
-          ...o,
           sno: i + 1,
-          cart, // used by Row + onPrintReceipt
-          invoice_number: o.order_id, // use order_id as invoice
-          order_date: orderDateStr,
-          order_time: orderTimeStr,
-          paymentMethod: o.payment_method,
-          total: Number(o.total_amount || 0),
-          user_name: o.user_name || "Cashier", // if you store user name
+          combo_id: c.combo_id,
+          combo_name: c.combo_name,
+          combo_price: Number(c.combo_price || 0),
+          combo_gst: Number(c.combo_gst || 0),
+          is_product: !!c.is_product, // true = product combo, false = service combo
+          status: c.status,
+          created_date: createdDate,
+          created_time: createdTime,
+          items, // used in Row collapse
         };
       });
 
-      setOrders(mappedOrders);
+      setOrders(mappedCombos);
     } catch (error) {
       console.error(error);
-      
     } finally {
       setLoading(false);
     }
@@ -302,85 +288,80 @@ function DisplayCombosTable() {
 
       <Box sx={{ minWidth: "calc( 99vw - 18vw)" }}>
         <HeaderPannel
-          HeaderTitle="Bills Generated"
+          HeaderTitle="Created Combos List"
           tableData={orders}
           onDownloadCurrentList={onDownloadxl}
         />
 
         <Box sx={{ width: "99%" }}>
           <TableContainer component={Paper}>
-                    <Table>
-                      {loading ? (
-                        <TableBody>
-                          <TableRow>
-                            <TableCell colSpan={9} align="center">
-                              <CircularProgress color="primary" />
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      ) : (
-                        <>
-                          <TableHead>
-                            <TableRow
-                              sx={{
-                                backgroundColor: "#0d3679",
-                              }}
-                            >
-                              <TableCell />
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                S No
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Invoice No
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Customer
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Mobile
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Order Date
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Payment
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Discount
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Total
-                              </TableCell>
-                              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                                Cashier
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {paginatedOrders.map((order) => (
-                              <Row
-                                key={order.order_id}
-                                order={order}
-                              />
-                            ))}
-                          </TableBody>
-                        </>
-                      )}
-                    </Table>
-                    <TablePagination
-                      component="div"
-                      count={orders.length}
-                      page={page}
-                      onPageChange={(event, newPage) => setPage(newPage)}
-                      rowsPerPage={rowsPerPage}
-                      onRowsPerPageChange={(event) => {
-                        setRowsPerPage(parseInt(event.target.value, 10));
-                        setPage(0); // reset to first page
+            <Table>
+              {loading ? (
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={9} align="center">
+                      <CircularProgress color="primary" />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              ) : (
+                <>
+                  <TableHead>
+                    <TableRow
+                      sx={{
+                        backgroundColor: "#0d3679",
                       }}
-                      rowsPerPageOptions={[10, 25, 50]}
-                    />
-                  </TableContainer>
-          <Box p={1} />
+                    >
+                      <TableCell />
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        S No
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Combo ID
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Combo Name
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Type
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Combo Price
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        GST
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Created At
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Status
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+
+                  <TableBody>
+                    {paginatedOrders.map((combo) => (
+                      <Row key={combo.combo_id} combo={combo} />
+                    ))}
+                  </TableBody>
+                </>
+              )}
+            </Table>
+            <TablePagination
+              component="div"
+              count={orders.length}
+              page={page}
+              onPageChange={(event, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0); // reset to first page
+              }}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </TableContainer>
+          {orders.length < 10 ? <Box p={2} /> : <Box p={8} />}
         </Box>
       </Box>
     </Box>

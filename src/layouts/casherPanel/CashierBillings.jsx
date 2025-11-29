@@ -30,7 +30,7 @@ import { generateReceipt, handlePrint } from "./cashFunctions";
 
 function Row({ order, onPrintReceipt }) {
   const [open, setOpen] = useState(false);
-  console.log(order);
+  // console.log(order);
 
   return (
     <>
@@ -104,6 +104,13 @@ function Row({ order, onPrintReceipt }) {
                       sx={{ color: "white", fontWeight: "bold" }}
                       align="right"
                     >
+                      Item Total
+                    </TableCell>
+
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="right"
+                    >
                       GST
                     </TableCell>
                     <TableCell
@@ -121,6 +128,7 @@ function Row({ order, onPrintReceipt }) {
                       <TableCell>{item.name}</TableCell>
                       <TableCell align="center">{item.quantity}</TableCell>
                       <TableCell align="right">₹{item.price}</TableCell>
+                      <TableCell align="right">₹{item.item_total}</TableCell>
                       <TableCell align="right">{item.gst}%</TableCell>
                       <TableCell align="center">
                         {item.is_combo === true ? "Yes" : "No"}
@@ -142,14 +150,15 @@ function CashierBillings() {
   const [orders, setOrders] = useState([]);
   const [orderMesg, setOrderMesg] = useState("");
   const [orderErrMesg, setOrderErrMesg] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const paginatedOrders = orders.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
+  const [rowCount, setRowCount] = useState(0); // totalUsers from backend
+
   const navigate = useNavigate();
+
   const [billIconBase64, setBillIconBase64] = useState("");
 
   const userLoginStatus = LsService.getItem(storageKey);
@@ -171,12 +180,10 @@ function CashierBillings() {
   const open = Boolean(anchorEl);
 
   useEffect(() => {
-    setPage(0); // go back to page 0 whenever orders change
-  }, [orders]);
+    fetchStoreOrders();
+  }, [paginationModel]);
 
   useEffect(() => {
-    fetchStoreOrders();
-
     fetch(billIcon)
       .then((res) => res.blob())
       .then((blob) => {
@@ -192,46 +199,130 @@ function CashierBillings() {
       setOrderErrMesg("");
       setLoading(true);
 
-      const response = await getAllOrders();
-      console.log(response.data);
+      const response = await getAllOrders({
+        page: paginationModel.page + 1, // backend is usually 1-based
+        limit: paginationModel.pageSize,
+      });
+      // console.log(response.data);
 
-      const apiOrders = response.data.data || [];
+      const apiData = response.data || {};
+      const apiOrders = apiData.data || [];
+      const totalUsers = apiData.totalOrders || 0;
 
       const mappedOrders = apiOrders.map((o, i) => {
         const orderDateObj = new Date(o.order_date);
         const orderDateStr = orderDateObj.toISOString().slice(0, 10); // YYYY-MM-DD
         const orderTimeStr = orderDateObj.toTimeString().slice(0, 5); // HH:MM
 
-        // Map OrderProducts -> cart[]
-        const cart = (o.OrderProducts || []).map((op) => {
+        // 🔹 GROUP PRODUCTS & COMBOS
+        const productMap = new Map();
+        const comboMap = new Map();
+
+        (o.OrderProducts || []).forEach((op) => {
+          // 👉 COMBO LINES
+          if (op.ComboProduct) {
+            const cp = op.ComboProduct;
+            const comboId = cp.combo_id;
+            const comboMeta = cp.Combo || {};
+
+            // ❗ if we already processed this combo_id once, ignore duplicates
+            if (comboMap.has(comboId)) return;
+
+            const lineQty = Number(op.quantity || 0); // quantity of this combo purchased
+            const comboName = comboMeta.combo_name || `Combo #${comboId}`; // use this
+            const comboPrice = Number(comboMeta.combo_price || 0); // use this
+            const comboGst = Number(comboMeta.combo_gst || 0); // use this
+
+            comboMap.set(comboId, {
+              combo_id: comboId,
+              name: comboName,
+              quantity: lineQty, // do NOT sum, just take from first row
+              pricePerCombo: comboPrice,
+              gst: comboGst,
+            });
+
+            return;
+          }
+
+          // 👉 NORMAL PRODUCT LINES
           const prod = Array.isArray(op.Products)
             ? op.Products[0]
             : op.Products;
-          return {
-            barcode: prod?.barcode || "N/A",
-            name: prod?.product_name || `#${op.pr_id}`,
-            quantity: op.quantity,
-            price: Number(op.price),
-            gst: Number(prod?.gst || 0),
-            is_combo: !!op.is_combo,
-          };
+          if (!prod) return;
+
+          const prId = prod.pr_id;
+          const lineQty = Number(op.quantity || 0);
+          const linePrice = Number(prod.discount_price || op.price || 0);
+          const gst = Number(prod.gst || 0);
+
+          let entry = productMap.get(prId);
+          if (!entry) {
+            entry = {
+              barcode: prod.barcode || "N/A",
+              name: prod.product_name || `#${prId}`,
+              quantity: 0,
+              totalPrice: 0,
+              gst,
+            };
+          }
+
+          entry.quantity += lineQty;
+          entry.totalPrice += lineQty * linePrice;
+
+          productMap.set(prId, entry);
+        });
+
+        // 🔹 Build cart[] from both maps
+        const cart = [];
+
+        // Normal products
+        productMap.forEach((p) => {
+          const unitPrice = p.quantity ? p.totalPrice / p.quantity : 0;
+          const total = unitPrice * p.quantity;
+
+          cart.push({
+            barcode: p.barcode,
+            name: p.name,
+            quantity: p.quantity,
+            price: unitPrice,
+            item_total: Number(total.toFixed(2)), // 👈 qty * price
+            gst: p.gst,
+            is_combo: false,
+          });
+        });
+
+        // Combos (one row per combo_id, using first occurrence only)
+        comboMap.forEach((c) => {
+          const total = c.pricePerCombo * c.quantity;
+
+          cart.push({
+            barcode: "N/A",
+            name: c.name, // combo_name
+            quantity: c.quantity, // quantity from the first row
+            price: c.pricePerCombo, // combo_price (per combo)
+            item_total: Number(total.toFixed(2)), // 👈 qty * price
+
+            gst: c.gst, // combo_gst
+            is_combo: true,
+          });
         });
 
         return {
           ...o,
           sno: i + 1,
-          cart, // used by Row + onPrintReceipt
-          invoice_number: o.order_id, // use order_id as invoice
+          cart, // ✅ aggregated list used by Row & onPrintReceipt
+          invoice_number: o.order_id,
           order_date: orderDateStr,
           order_time: orderTimeStr,
           paymentMethod: o.payment_method,
           total: Number(o.total_amount || 0),
-          user_name: o.user_name || "Cashier", // if you store user name
+          user_name: o.user_name || "Cashier",
         };
       });
 
       setOrders(mappedOrders);
       setOrderMesg(response.data.message);
+      setRowCount(totalUsers);
     } catch (error) {
       console.error(error);
       setOrderErrMesg(
@@ -276,6 +367,8 @@ function CashierBillings() {
       customer_name: order.customer_name || "Guest",
     };
 
+    const invoiceName = "TAX INVOICE COPY";
+
     const receiptContent = generateReceipt(
       rePrintPayload,
       billIconBase64,
@@ -283,7 +376,8 @@ function CashierBillings() {
       order.user_name,
       order.order_date,
       order.order_time,
-      userLoginStatus
+      userLoginStatus,
+      invoiceName
     );
 
     handlePrint(receiptContent);
@@ -483,7 +577,7 @@ function CashierBillings() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {paginatedOrders.map((order) => (
+                  {orders.map((order) => (
                     <Row
                       key={order.order_id}
                       order={order}
@@ -496,18 +590,20 @@ function CashierBillings() {
           </Table>
           <TablePagination
             component="div"
-            count={orders.length}
-            page={page}
-            onPageChange={(event, newPage) => setPage(newPage)}
-            rowsPerPage={rowsPerPage}
+            count={rowCount}
+            page={paginationModel.page}
+            onPageChange={(_e, newPage) =>
+              setPaginationModel((prev) => ({ ...prev, page: newPage }))
+            }
+            rowsPerPage={paginationModel.pageSize}
             onRowsPerPageChange={(event) => {
-              setRowsPerPage(parseInt(event.target.value, 10));
-              setPage(0); // reset to first page
+              const newSize = parseInt(event.target.value, 10);
+              setPaginationModel({ page: 0, pageSize: newSize });
             }}
             rowsPerPageOptions={[10, 25, 50]}
           />
         </TableContainer>
-        <Box p={1} />
+        {rowCount < 10 ? <Box p={2} /> : <Box p={8} />}
       </Box>
     </Box>
   );

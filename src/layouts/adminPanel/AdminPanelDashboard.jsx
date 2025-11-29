@@ -32,7 +32,7 @@ const AdminPanelDashboard = () => {
     const fetchTableData = async () => {
         try {
           const response = await getDashboardStats(user.branch_id);
-          console.log(response.data);
+          // console.log(response.data);
           setCounts(response.data.data);
         } catch (error) {
           console.error("Error fetching products:", error);}
@@ -52,7 +52,7 @@ const AdminPanelDashboard = () => {
     {
       HeadTitle: "Total Products",
       IconCompo: LocalMallIcon,
-      Value: counts.totalProducts || 0,
+      Value: counts?.totalProducts ? counts?.totalProducts : 0,
       navpath: "/inventory",
     },
     // {
@@ -64,13 +64,13 @@ const AdminPanelDashboard = () => {
     {
       HeadTitle: "Total Customers",
       IconCompo: SupervisorAccountIcon,
-      Value: counts.totalCustomers || 0,
+      Value: counts?.totalCustomers ? counts?.totalCustomers : 0,
       navpath: "/manage_customers",
     },
     {
       HeadTitle: "Total Orders",
       IconCompo: TrackChangesIcon,
-      Value: counts.totalOrders || 0,
+      Value: counts?.totalOrders ? counts?.totalOrders : 0,
       navpath: "/billings",
     },
     // {
@@ -100,19 +100,19 @@ const AdminPanelDashboard = () => {
     {
       HeadTitle: "Total Low Stock Products",
       IconCompo: BookmarkRemoveIcon,
-      Value: counts.lowStockProducts || 0,
+      Value: counts?.lowStockProducts ? counts?.lowStockProducts : 0,
       navpath: "/products",
     },
     {
       HeadTitle: "Total Out of Stock Products",
       IconCompo: DangerousIcon,
-      Value: counts.outOfStockProducts || 0,
+      Value: counts?.outOfStockProducts ? counts?.outOfStockProducts : 0,
       navpath: "/products",
     },
     {
       HeadTitle: "Total Sales",
       IconCompo: ShowChartIcon,
-      Value: `₹${formatToINR(counts.totalSales)}` || 0,
+      Value: counts?.totalSales ? `₹${formatToINR(counts?.totalSales)}` : 0,
       navpath: "/billings",
     },
     {

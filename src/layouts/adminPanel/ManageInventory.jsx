@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import {
   getAllProducts,
-  fetchBySearchMainProducts,
+  fetchBySearchInventory,
   updateProduct,
 } from "../../services/api";
 import {
@@ -82,11 +82,11 @@ function ManageInventoryPage() {
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
       });
-      console.log(response.data);
+      // console.log(response.data);
 
       const apiData = response.data || {};
       const products = apiData.data || [];
-      const total = apiData.totalUsers || apiData.total || products.length;
+      const total = apiData.totalProducts;
 
       const mappedData = products.map((prod, index) => ({
         ...prod,
@@ -203,8 +203,11 @@ function ManageInventoryPage() {
       setLoading(true);
 
       const trimmedSearch = search.trim();
-      const response = await fetchBySearchMainProducts(userDetails.branch_id, trimmedSearch);
-      console.log(response.data.products);
+      const response = await fetchBySearchInventory(
+        userDetails.branch_id,
+        trimmedSearch
+      );
+      // console.log(response.data.products);
 
       const data = response.data.products || [];
 
@@ -280,7 +283,7 @@ function ManageInventoryPage() {
 
       <Box sx={{ minWidth: "calc( 99vw - 18vw)", ml: 1.5 }}>
         <HeaderPannel
-          HeaderTitle="Manage Clients"
+          HeaderTitle="Inventory Management"
           tableData={tableData}
           onDownloadCurrentList={onDownloadxl}
         />
@@ -421,6 +424,7 @@ function ManageInventoryPage() {
               rowsPerPageOptions={[10, 25, 50, 100]}
             />
           </Paper>
+          {rowCount < 10 ? <Box p={2} /> : <Box p={8} />}
         </Box>
       </Box>
     </Box>

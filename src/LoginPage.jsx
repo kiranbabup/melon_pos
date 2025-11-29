@@ -27,7 +27,7 @@ const LoginPage = () => {
   const user = LsService.getItem(storageKey);
 
   useEffect(() => {
-    console.log(user);
+    // console.log(user);
     if (user) {
       if (user.role === "super_admin") {
         navigate("/super_admin");
@@ -49,7 +49,7 @@ const LoginPage = () => {
     setErrorMsg("");
     try {
       const response = await login({ email: loginId, password });
-      console.log(response.data);
+      // console.log(response.data);
       const { token } = response.data;
       const branchDetails = response.data.user.Branch;
       const { branch_id, name, role, status, user_id } = response.data.user;

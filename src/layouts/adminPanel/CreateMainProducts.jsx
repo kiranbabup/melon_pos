@@ -150,7 +150,7 @@ function CreateMainProducts() {
 
       {/* Right pannel */}
       <Box sx={{ minWidth: "calc( 99vw - 18vw)", ml: 1.5 }}>
-        <HeaderPannel HeaderTitle="Add Products to Main Inventory" />
+        <HeaderPannel HeaderTitle="Add Products or Services" />
         <Box sx={{ width: "99%" }}>
           <Box
             sx={{

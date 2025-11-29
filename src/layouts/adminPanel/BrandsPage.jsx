@@ -39,7 +39,7 @@ const BrandsPage = () => {
 
   useEffect(() => {
     fetchBrands();
-  }, []);
+  }, [paginationModel]);
 
   useEffect(() => {
     const start = paginationModel.page * paginationModel.pageSize;
@@ -51,20 +51,23 @@ const BrandsPage = () => {
     try {
       setLoading(true);
 
-      const response = await getAllBrands();
+      const response = await getAllBrands({
+        page: paginationModel.page + 1,
+        limit: paginationModel.pageSize,
+      });
       // console.log(response.data);
 
       const apiData = response.data || {};
       const brandsArr = apiData.data || [];
-
-      const mappedData = brandsArr.map((sup, index) => ({
-        ...sup,
-        id: index + 1, // sequential table ID
-        created_on: sup.created_at?.slice(0, 10),
+      const total = apiData.totalBrands;
+      const mappedData = brandsArr.map((brand, index) => ({
+        ...brand,
+        id: paginationModel.page * paginationModel.pageSize + index + 1, // sequential table ID
+        created_on: brand.created_at?.slice(0, 10),
       }));
 
       setAllBrands(mappedData);
-      setRowCount(apiData.totalBrands || brandsArr.length); // Total count
+      setRowCount(total); // Total count
     } catch (error) {
       console.error("Error fetching Brands:", error);
     } finally {
@@ -133,7 +136,7 @@ const BrandsPage = () => {
         status: true,
       });
       // console.log(response.data);
-      
+
       setBrandMesg(response.data.message);
       setEditModalOpen(false);
       fetchBrands();
@@ -374,6 +377,7 @@ const BrandsPage = () => {
               rowsPerPageOptions={[10, 25, 50, 100]}
             />
           </Paper>
+          {rowCount < 10 ? <Box p={2} /> : <Box p={8} />}
         </Box>
       </Box>
     </Box>

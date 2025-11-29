@@ -59,7 +59,7 @@ function EditProductsModal({ open, onClose, productsData, fetchProducts }) {
       // console.log(formData);
       setLoading(true);
       const response = await updateProduct(productsData.pr_id, formData);
-      console.log(response);
+      // console.log(response);
       // console.log(response.data);
       if (response.status === 200) {
         setProductMesg(response.data.message);
@@ -84,7 +84,9 @@ function EditProductsModal({ open, onClose, productsData, fetchProducts }) {
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>Edit Prodct Details</DialogTitle>
+      <DialogTitle sx={{ backgroundColor: "#0d3679", color: "white" }}>
+        Edit Prodct Details
+      </DialogTitle>
       <DialogContent>
         <Grid container spacing={2} sx={{ my: 2 }}>
           {/* String Fields */}
@@ -240,6 +242,7 @@ function EditProductsModal({ open, onClose, productsData, fetchProducts }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          borderTop: "1px dashed grey",
         }}
       >
         <Button variant="outlined" color="error" onClick={onClose}>

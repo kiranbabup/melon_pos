@@ -78,7 +78,7 @@ function ManageClientsPage() {
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
       });
-      console.log(response.data);
+      // console.log(response.data);
 
       // Destructure from the API shape
       const apiData = response.data || {};
@@ -263,7 +263,7 @@ function ManageClientsPage() {
         editusrSrlno,
         formData.password
       );
-      console.log(response);
+      // console.log(response);
 
       if (response.status === 200) {
         setUserMesg(response.data.message || "Password updated successfully");

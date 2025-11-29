@@ -1,6 +1,6 @@
 import "../../App.css"
 
-export const generateReceipt = (billingData, billIconBase64, invoiceNumber, cashier_name, date, time, loginUserData) => {
+export const generateReceipt = (billingData, billIconBase64, invoiceNumber, cashier_name, date, time, loginUserData, invoiceName) => {
   // console.log(billingData);
   // console.log(billingData.products);
   // console.log(storeDetails);
@@ -31,7 +31,7 @@ export const generateReceipt = (billingData, billIconBase64, invoiceNumber, cash
 
       <hr style="border-bottom: 1px dashed #000;">
       
-      <h3 style="text-align: center; margin: 0; padding: 0;">TAX INVOICE</h3>
+      <h3 style="text-align: center; margin: 0; padding: 0;">${invoiceName}</h3>
 
       <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 0; padding: 0;">
         <span>Customer Name: </span>

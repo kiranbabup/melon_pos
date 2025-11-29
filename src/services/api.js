@@ -2,8 +2,8 @@
 import axios from 'axios'
 import LsService from './localstorage';
 
-// export const baseURL = 'https://melon.invtechnologies.in/'
-export const baseURL = 'http://192.168.0.103:1538/'
+export const baseURL = 'https://melon.invtechnologies.in/'
+// export const baseURL = 'http://192.168.0.104:1538/'
 
 const api = axios.create({
   baseURL,
@@ -28,7 +28,7 @@ export const login = (data) =>
 
 // dashboard stats
 export const getDashboardStats = (branch_id) =>
-  api.get( `/user/dashboard-stats/${branch_id}`);
+  api.get(`/user/dashboard-stats/${branch_id}`);
 
 // users Apis
 export const getAllUsers = (params) =>
@@ -48,7 +48,7 @@ export const updateUserPassword = (userId, newPassword) =>
 // ---- BRANCHES ----
 // was getAllStores before – now branches
 export const getAllBranches = (params) =>
-  api.get('branch/fetch-branches', { params }); 
+  api.get('branch/fetch-branches', { params });
 
 export const updateBranches = (brand_id, data) =>
   api.put(`/branch/update-branch/${brand_id}`, data)
@@ -57,8 +57,8 @@ export const updateBranches = (brand_id, data) =>
 export const createBrand = (data) =>
   api.post('brand/create-brand', data)
 
-export const getAllBrands = () =>
-  api.get('brand/fetch-brands')
+export const getAllBrands = (params) =>
+  api.get('brand/fetch-brands', { params })
 
 export const updateBrand = (brand_id, data) =>
   api.put(`brand/update-brand/${brand_id}`, data)
@@ -67,44 +67,49 @@ export const updateBrand = (brand_id, data) =>
 export const createProduct = (data) =>
   api.post('/product/create-product', data)
 
-export const fetchBySearchMainProducts = (branchId, searchTerm) =>
-  api.get(`product/search-product/${branchId}`, {
+export const fetchBySearchInventory = (branchId, searchTerm) =>
+  api.get(`product/inventry-search-product/${branchId}`, {
     params: { search: searchTerm },
   });
 
-export const getAllProducts = (branch_id) =>
-  api.get(`/product/fetch-products/${branch_id}`)
+export const getAllProducts = (branch_id, params) =>
+  api.get(`/product/fetch-products/${branch_id}`, { params })
 
 export const updateProduct = (prid, data) =>
   api.put(`product/update-product/${prid}`, data)
 
 // billing management APIs
-export const billing = (payload) => {
+export const fetchBySearchMainProducts = (branchId, searchTerm) =>
+  api.get(`product/search-product/${branchId}`, {
+    params: { search: searchTerm },
+  });
+
+export const billOrder = (payload) => {
   return api.post('orders/place-order', payload);
 }
 
 export const fetchByOrderID = (id) =>
   api.get(`orders/fetch-order-byid/${id}`);
 
-export const getAllOrders = () =>
-  api.get("orders/fetch-orders")
+export const getAllOrders = (params) =>
+  api.get("orders/fetch-orders", { params });
 
 // customer management APIs
 export const getAllCustomers = (params) =>
   api.get('customers/fetch-customers', { params });
 
 export const fetchBySearchPhone = (phone) =>
-  api.get(`customer/search-customer`, {params: { search: phone }});
+  api.get(`customer/search-customer`, { params: { search: phone } });
 
-export const fetchCustomerOrdersByPhone = (phone) =>
-  api.get(`orders/fetch-customer-orders/${phone}`);
+export const fetchCustomerOrdersByPhone = (phone, params) =>
+  api.get(`orders/fetch-customer-orders/${phone}`, { params });
 
 // combos management APIs
 export const addCombo = (data) =>
-  api.post('/combo/create-combo', data)
+  api.post('combo/create-combo', data)
 
-export const getCombosByBranch = (storeid) =>
-  api.get(`get_store_combos/${storeid}`)
+export const getCombosByBranch = (branch_id) =>
+  api.get(`combo/fetch-combos/${branch_id}`)
 
 
 

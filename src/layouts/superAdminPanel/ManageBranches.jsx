@@ -34,10 +34,10 @@ function ManageBranchesPage() {
   });
   const [rowCount, setRowCount] = useState(0);
   // const [allUsers, setAllUsers] = useState([]);
-  const [loadingUser, setLoadingUser] = useState(false);
+  // const [loadingUser, setLoadingUser] = useState(false);
   const [userMesg, setUserMesg] = useState("");
   const [userErrMesg, setUserErrMesg] = useState("");
-  const [editusrSrlno, setEditusrSrlno] = useState(null);
+  // const [editusrSrlno, setEditusrSrlno] = useState(null);
   const [formType, setFormType] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   // const [formData, setFormData] = useState({
@@ -62,7 +62,7 @@ function ManageBranchesPage() {
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
       });
-      console.log(response.data);
+      // console.log(response.data);
 
       // Destructure from the API shape
       const apiData = response.data || {};
@@ -349,7 +349,7 @@ function ManageBranchesPage() {
 
       <Box sx={{ minWidth: "calc( 99vw - 18vw)", ml: 1.5 }}>
         <HeaderPannel
-          HeaderTitle="Manage Clients"
+          HeaderTitle="Manage Branches"
           tableData={tableData}
           onDownloadCurrentList={onDownloadxl}
         />

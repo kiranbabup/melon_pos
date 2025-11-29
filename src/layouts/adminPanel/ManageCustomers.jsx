@@ -18,7 +18,13 @@ import {
   TableRow,
   TextField,
   Typography,
+  Collapse,
+  IconButton,
 } from "@mui/material";
+
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+
 import LeftPannel from "../../components/LeftPannel";
 import HeaderPannel from "../../components/HeaderPannel";
 import * as XLSX from "xlsx";
@@ -37,6 +43,111 @@ const formatOrderDateTime = (isoString) => {
   return `${date} ${time}`;
 };
 
+function Row({ order }) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <>
+      {/* Parent Row = Order */}
+      <TableRow>
+        <TableCell>
+          <IconButton size="small" onClick={() => setOpen(!open)}>
+            {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+          </IconButton>
+        </TableCell>
+        <TableCell>{order.sno}</TableCell>
+        <TableCell>INV{order.invoice_number}</TableCell>
+        <TableCell>
+          {order.customer_name ? order.customer_name : "N/A"}
+        </TableCell>
+        <TableCell>
+          {order.customer_phone ? order.customer_phone : "N/A"}
+        </TableCell>
+        <TableCell>
+          {order.order_date} {order.order_time}
+        </TableCell>
+        <TableCell>{order.paymentMethod}</TableCell>
+        <TableCell>₹{order.discount_price}</TableCell>
+        <TableCell>₹{order.total}</TableCell>
+      </TableRow>
+
+      {/* Collapsible Child Row = Cart Items */}
+      <TableRow>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={9}>
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <Box margin={1}>
+              <Typography variant="h6" gutterBottom>
+                Items
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow
+                    sx={{
+                      backgroundColor: "#506991",
+                    }}
+                  >
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                      Barcode
+                    </TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                      Name
+                    </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="center"
+                    >
+                      Qty
+                    </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="right"
+                    >
+                      Price
+                    </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="right"
+                    >
+                      Item Total
+                    </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="right"
+                    >
+                      GST
+                    </TableCell>
+                    <TableCell
+                      sx={{ color: "white", fontWeight: "bold" }}
+                      align="center"
+                    >
+                      isCombo
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {order.cart?.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{item.barcode}</TableCell>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell align="center">{item.quantity}</TableCell>
+                      <TableCell align="right">₹{item.price}</TableCell>
+                      <TableCell align="right">₹{item.item_total}</TableCell>
+                      <TableCell align="right">{item.gst}%</TableCell>
+                      <TableCell align="center">
+                        {item.is_combo === true ? "Yes" : "No"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
+  );
+}
+
 function ManageCustomers() {
   const [loading, setLoading] = useState(false);
   const [tableData, setTableData] = useState([]);
@@ -53,6 +164,11 @@ function ManageCustomers() {
     name: "",
     phone: "",
   });
+  const [ordersPagination, setOrdersPagination] = useState({
+    page: 0,
+    pageSize: 10,
+  });
+  const [ordersRowCount, setOrdersRowCount] = useState(0);
 
   // -------- Columns --------
   const columns = [
@@ -96,16 +212,20 @@ function ManageCustomers() {
             size="small"
             variant="contained"
             onClick={() => {
+              const phone = params.row.customer_phone || "N/A";
+
               setSelectedCustomer({
                 name:
                   params.row.customer_name &&
                   params.row.customer_name.trim() !== ""
                     ? params.row.customer_name
                     : "N/A",
-                phone: params.row.customer_phone || "N/A",
+                phone,
               });
+
               setdisplayCustomerData(true);
-              onHandleViewCustomerOrders(params.row.customer_phone);
+              setOrdersPagination({ page: 0, pageSize: 10 });
+              onHandleViewCustomerOrders(phone, 0, 10);
             }}
           >
             View
@@ -124,7 +244,7 @@ function ManageCustomers() {
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
       });
-      console.log(response.data);
+      // console.log(response.data);
 
       const apiData = response.data || {};
       const customers = apiData.data || [];
@@ -150,21 +270,19 @@ function ManageCustomers() {
     try {
       setLoading(true);
       const res = await fetchBySearchPhone(phone);
-      console.log("search result:", res.data);
+      // console.log("search result:", res.data);
 
-      const cust = res.data?.data;
-      if (cust) {
-        const mapped = {
-          ...cust,
-          id: 1,
-          created_on: cust.created_at?.slice(0, 10),
-        };
-        setTableData([mapped]);
-        setRowCount(1);
-      } else {
-        setTableData([]);
-        setRowCount(0);
-      }
+      const data = res.data?.data || [];
+      const list = Array.isArray(data) ? data : [data];
+
+      const mapped = list.map((cust, index) => ({
+        ...cust,
+        id: index + 1,
+        created_on: cust.created_at?.slice(0, 10),
+      }));
+
+      setTableData(mapped);
+      setRowCount(mapped.length);
     } catch (error) {
       console.error("Failed to fetch customer by phone:", error);
       setTableData([]);
@@ -186,60 +304,163 @@ function ManageCustomers() {
   useEffect(() => {
     if (!search) {
       setPaginationModel((prev) => ({ ...prev, page: 0 }));
+      fetchTableData();
       return;
     }
 
-    if (search.length === 10) {
-      setPaginationModel({ page: 0, pageSize: 10 });
-      fetchCustomerByPhone(search);
-    }
+    // any length > 0 -> search
+    setPaginationModel({ page: 0, pageSize: 10 });
+    fetchCustomerByPhone(search);
   }, [search]);
 
-  const onHandleViewCustomerOrders = async (phone) => {
+  useEffect(() => {
+    if (!displayCustomerData || !selectedCustomer.phone) return;
+
+    onHandleViewCustomerOrders(
+      selectedCustomer.phone,
+      ordersPagination.page,
+      ordersPagination.pageSize
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordersPagination]);
+
+  // Build aggregated cart (products + combos) from a single order object
+  const buildCartForOrder = (order) => {
+    const productMap = new Map();
+    const comboMap = new Map();
+
+    (order.OrderProducts || []).forEach((op) => {
+      // 👉 COMBO LINES
+      if (op.ComboProduct) {
+        const cp = op.ComboProduct;
+        const comboId = cp.combo_id;
+        const comboMeta = cp.Combo || {};
+
+        // if we already processed this combo_id once, ignore duplicates
+        if (comboMap.has(comboId)) return;
+
+        const lineQty = Number(op.quantity || 0); // quantity purchased of this combo
+        const comboName = comboMeta.combo_name || `Combo #${comboId}`;
+        const comboPrice = Number(comboMeta.combo_price || 0);
+        const comboGst = Number(comboMeta.combo_gst || 0);
+
+        comboMap.set(comboId, {
+          combo_id: comboId,
+          name: comboName,
+          quantity: lineQty,
+          pricePerCombo: comboPrice,
+          gst: comboGst,
+        });
+
+        return;
+      }
+
+      // 👉 NORMAL PRODUCT / SERVICE LINES
+      const prod = Array.isArray(op.Products) ? op.Products[0] : op.Products;
+      if (!prod) return;
+
+      const prId = prod.pr_id;
+      const lineQty = Number(op.quantity || 0);
+      const linePrice = Number(prod.discount_price || op.price || 0);
+      const gst = Number(prod.gst || 0);
+
+      let entry = productMap.get(prId);
+      if (!entry) {
+        entry = {
+          barcode: prod.barcode || "N/A",
+          name: prod.product_name || `#${prId}`,
+          quantity: 0,
+          totalPrice: 0,
+          gst,
+        };
+      }
+
+      entry.quantity += lineQty;
+      entry.totalPrice += lineQty * linePrice;
+
+      productMap.set(prId, entry);
+    });
+
+    // 🔹 Build final cart[]
+    const cart = [];
+
+    // Normal products/services
+    productMap.forEach((p) => {
+      const unitPrice = p.quantity ? p.totalPrice / p.quantity : 0;
+      const total = unitPrice * p.quantity;
+
+      cart.push({
+        barcode: p.barcode,
+        name: p.name,
+        quantity: p.quantity,
+        price: Number(unitPrice.toFixed(2)),
+        item_total: Number(total.toFixed(2)),
+        gst: p.gst,
+        is_combo: false,
+      });
+    });
+
+    // Combos (one row per combo_id – first occurrence only)
+    comboMap.forEach((c) => {
+      const total = c.pricePerCombo * c.quantity;
+
+      cart.push({
+        barcode: "N/A",
+        name: c.name,
+        quantity: c.quantity,
+        price: Number(c.pricePerCombo.toFixed(2)),
+        item_total: Number(total.toFixed(2)),
+        gst: c.gst,
+        is_combo: true,
+      });
+    });
+
+    return cart;
+  };
+
+  // inside ManageCustomers component, before return()
+  const customerOrdersWithCart = customerOrdersData.map((o, i) => {
+    const orderDateObj = new Date(o.order_date);
+    const orderDateStr = orderDateObj.toISOString().slice(0, 10);
+    const orderTimeStr = orderDateObj.toTimeString().slice(0, 5);
+
+    return {
+      ...o,
+      sno: ordersPagination.page * ordersPagination.pageSize + i + 1,
+      invoice_number: o.order_id,
+      order_date: orderDateStr,
+      order_time: orderTimeStr,
+      paymentMethod: o.payment_method,
+      discount_price: Number(o.discount_price || 0),
+      total: Number(o.total_amount || 0),
+      cart: buildCartForOrder(o),
+    };
+  });
+
+  const onHandleViewCustomerOrders = async (phone, page = 0, pageSize = 10) => {
     try {
       setLoadingData(true);
-      const response = await fetchCustomerOrdersByPhone(phone);
-      console.log(response.data.data);
-      setCustomerOrdersData(response.data.data);
+
+      const response = await fetchCustomerOrdersByPhone(phone, {
+        page: page + 1, // backend is 1-based
+        limit: pageSize,
+      });
+
+      const apiData = response.data || {};
+      const orders = apiData.data || [];
+      const totalOrders =
+        apiData.totalUsers || apiData.totalOrders || orders.length;
+
+      setCustomerOrdersData(orders);
+      setOrdersRowCount(totalOrders);
     } catch (error) {
       console.error("Error fetching customers:", error);
+      setCustomerOrdersData([]);
+      setOrdersRowCount(0);
     } finally {
       setLoadingData(false);
     }
   };
-
-  // Group orders into products / services for display
-  const productOrders = customerOrdersData
-    .map((order) => {
-      const items = (order.OrderProducts || [])
-        .map((op) => {
-          const prod = Array.isArray(op.Products)
-            ? op.Products[0]
-            : op.Products;
-          return { ...op, product: prod };
-        })
-        .filter((it) => it.product && it.product.category_id === 1); // Products only
-
-      if (items.length === 0) return null;
-      return { order, items };
-    })
-    .filter(Boolean);
-
-  const serviceOrders = customerOrdersData
-    .map((order) => {
-      const items = (order.OrderProducts || [])
-        .map((op) => {
-          const prod = Array.isArray(op.Products)
-            ? op.Products[0]
-            : op.Products;
-          return { ...op, product: prod };
-        })
-        .filter((it) => it.product && it.product.category_id === 2); // Services only
-
-      if (items.length === 0) return null;
-      return { order, items };
-    })
-    .filter(Boolean);
 
   // -------- Export to Excel --------
   const onDownloadxl = () => {
@@ -422,6 +643,7 @@ function ManageCustomers() {
                 rowsPerPageOptions={[10, 25, 50, 100]}
               />
             </Paper>
+            {rowCount < 10 ? <Box p={2} /> : <Box p={8} />}
           </Box>
         ) : (
           <Box sx={{ width: "99%", mb: 4 }}>
@@ -474,12 +696,12 @@ function ManageCustomers() {
               </Box>
             </Box>
 
-            {/* Products & Services columns */}
+            {/* Orders table with collapsible rows (like AdminBillingPage) */}
             {loadingData ? (
               <Box sx={{ textAlign: "center", mt: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : customerOrdersData.length === 0 ? (
+            ) : customerOrdersWithCart.length === 0 ? (
               <Box
                 sx={{
                   borderRadius: "10px",
@@ -494,130 +716,72 @@ function ManageCustomers() {
                 </Typography>
               </Box>
             ) : (
-              customerOrdersData.map((order) => {
-                const items = order.OrderProducts || [];
-                const invoiceNo = `INV${order.order_id}`;
-                const orderDateTime = formatOrderDateTime(order.order_date);
-                const totalAmount = Number(order.total_amount || 0).toFixed(2);
-                const orderDiscount = Number(order.discount_price || 0).toFixed(
-                  2
-                );
-
-                return (
-                  <Box
-                    key={order.order_id}
-                    sx={{
-                      mb: 3,
-                      borderRadius: "10px",
-                      boxShadow:
-                        "rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px",
-                      overflow: "hidden",
-                      background: "#fff",
-                    }}
-                  >
-                    {/* Order header row – like Bills table top row */}
-                    <Box
+              <Paper sx={{ width: "100%", overflowX: "auto" }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow
                       sx={{
                         backgroundColor: "#0d3679",
-                        color: "white",
-                        p: 1.5,
-                        display: "flex",
-                        flexWrap: "wrap",
-                        gap: 3,
                       }}
                     >
-                      <Typography>
-                        Order ID: <strong>{invoiceNo}</strong>
-                      </Typography>
-                      <Typography>
-                        Order Date &amp; Time: <strong>{orderDateTime}</strong>
-                      </Typography>
-                      <Typography>
-                        Total Order Amount: <strong>₹{totalAmount}</strong>
-                      </Typography>
-                      <Typography>
-                        Order Discount: <strong>₹{orderDiscount}</strong>
-                      </Typography>
-                      <Typography>
-                        Payment Method: <strong>{order.payment_method}</strong>
-                      </Typography>
-                    </Box>
-
-                    {/* Inner table – Cart Items */}
-                    <Box sx={{ p: 2 }}>
-                      <Typography
-                        variant="subtitle1"
-                        fontWeight="bold"
-                        sx={{ mb: 1 }}
-                      >
-                        Cart Items
-                      </Typography>
-
-                      <Paper sx={{ width: "100%", overflowX: "auto" }}>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow sx={{ backgroundColor: "#f0f4ff" }}>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                S No
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                Name
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                Type
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                Qty
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                MRP Price
-                              </TableCell>
-                              <TableCell sx={{ fontWeight: "bold" }}>
-                                Selling Price
-                              </TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {items.map((op, idx) => {
-                              const prod = Array.isArray(op.Products)
-                                ? op.Products[0]
-                                : op.Products;
-
-                              const categoryId = prod?.category_id;
-                              const isService = categoryId === 2;
-                              const typeLabel = isService
-                                ? "Service"
-                                : "Product";
-                              const name = prod?.product_name || `#${op.pr_id}`;
-                              const mrp = Number(prod?.mrp_price || 0).toFixed(
-                                2
-                              );
-                              const selling = Number(
-                                prod?.discount_price || op.price || 0
-                              ).toFixed(2);
-
-                              return (
-                                <TableRow
-                                  key={`${order.order_id}-${op.pr_id}-${idx}`}
-                                >
-                                  <TableCell>{idx + 1}</TableCell>
-                                  <TableCell>{name}</TableCell>
-                                  <TableCell>{typeLabel}</TableCell>
-                                  <TableCell>{op.quantity}</TableCell>
-                                  <TableCell>₹{mrp}</TableCell>
-                                  <TableCell>₹{selling}</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </Paper>
-                    </Box>
-                  </Box>
-                );
-              })
+                      <TableCell />
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        S No
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Invoice No
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Customer
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Mobile
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Order Date
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Payment
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Discount
+                      </TableCell>
+                      <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                        Total
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {customerOrdersWithCart.map((order) => (
+                      <Row key={order.order_id} order={order} />
+                    ))}
+                  </TableBody>
+                </Table>
+                {!loadingData && customerOrdersWithCart.length > 0 && (
+                  <TablePagination
+                    component="div"
+                    count={ordersRowCount}
+                    page={ordersPagination.page}
+                    rowsPerPage={ordersPagination.pageSize}
+                    onPageChange={(_e, newPage) =>
+                      setOrdersPagination((prev) => ({
+                        ...prev,
+                        page: newPage,
+                      }))
+                    }
+                    onRowsPerPageChange={(e) =>
+                      setOrdersPagination({
+                        page: 0,
+                        pageSize: parseInt(e.target.value, 10),
+                      })
+                    }
+                    rowsPerPageOptions={[5, 10, 25]}
+                  />
+                )}
+              </Paper>
             )}
-            <Box p={1}/>
+
+            <Box p={2} />
           </Box>
         )}
       </Box>

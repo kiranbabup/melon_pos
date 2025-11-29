@@ -30,7 +30,7 @@ function CreateComboPage() {
     description: "",
     combo_gst: 0,
     is_product: 0,
-    services: [{ product_id: "", price: "" }],
+    services: [{ pr_id: "", price: "" }],
   });
 
   // Get store_id from localStorage
@@ -62,13 +62,13 @@ function CreateComboPage() {
       try {
         setLoading(true);
         const response = await getAllProducts(branch_id);
-        console.log("branch products:", response.data.data);
+        // console.log("branch products:", response.data.data);
 
         const mappedData = response.data.data.map((prod, index) => ({
           id: index + 1,
           quantity: prod.quantity,
           // flatten pos_product
-          product_id: prod?.pr_id,
+          pr_id: prod?.pr_id,
           product_name: prod?.product_name,
           product_price: prod?.discount_price,
           category_id: prod?.category_id,
@@ -96,18 +96,18 @@ function CreateComboPage() {
     setFormData((prev) => ({
       ...prev,
       is_product: value,
-      services: [{ product_id: "", price: "" }],
+      services: [{ pr_id: "", price: "" }],
     }));
   };
   const handleServiceChange = (index, name, value) => {
     setFormData((prev) => {
       const updated = [...prev.services];
 
-      if (name === "product_id") {
-        const prod = storeProducts.find((p) => p.product_id === value);
+      if (name === "pr_id") {
+        const prod = storeProducts.find((p) => p.pr_id === value);
         updated[index] = {
           ...updated[index],
-          product_id: value,
+          pr_id: value,
           // auto-fill price from discount_price
           price: prod ? String(prod.product_price || "") : "",
         };
@@ -123,7 +123,7 @@ function CreateComboPage() {
   const handleAddServiceRow = () => {
     setFormData((prev) => ({
       ...prev,
-      services: [...prev.services, { product_id: "", price: "" }],
+      services: [...prev.services, { pr_id: "", price: "" }],
     }));
   };
 
@@ -133,7 +133,7 @@ function CreateComboPage() {
       updated.splice(index, 1);
       return {
         ...prev,
-        services: updated.length ? updated : [{ product_id: "", price: "" }],
+        services: updated.length ? updated : [{ pr_id: "", price: "" }],
       };
     });
   };
@@ -160,18 +160,17 @@ function CreateComboPage() {
     }
 
     const selectedServices = formData.services.filter(
-      (s) => s.product_id && s.price !== ""
+      (s) => s.pr_id && s.price !== ""
     );
 
     if (selectedServices.length === 0) {
       setProductErrMesg("Please select at least one item");
       return;
     }
-
-    // build comma-separated ids & prices
-    const productIdsStr = selectedServices.map((s) => s.product_id).join(",");
-
-    const pricesStr = selectedServices.map((s) => s.price).join(",");
+const servicesPayload = selectedServices.map((s) => ({
+  pr_id: Number(s.pr_id),   // or keep as string if API expects string
+  price: Number(s.price),
+}));
 
     try {
       setLoading(true);
@@ -185,15 +184,10 @@ function CreateComboPage() {
         combo_price: Number(formData.combo_price || 0), // total combo price
         description: formData.description,
         combo_gst: gst,
-        services: [
-          {
-            product_id: productIdsStr, // "2,5,9"
-            price: pricesStr, // "200,100,150"
-          },
-        ],
+        services: servicesPayload,
       };
 
-      console.log("Final Payload:", payload);
+      // console.log("Final Payload:", payload);
       const response = await addCombo(payload);
 
       if (response.status === 201) {
@@ -222,7 +216,7 @@ function CreateComboPage() {
       description: "",
       combo_gst: 0,
       is_product: 0,
-      services: [{ product_id: "", price: "" }],
+      services: [{ pr_id: "", price: "" }],
     });
   };
 
@@ -251,7 +245,7 @@ function CreateComboPage() {
 
       {/* Right pannel */}
       <Box sx={{ minWidth: "calc( 99vw - 18vw)" }}>
-        <HeaderPannel HeaderTitle="Add Combo Products to Store Inventory" />
+        <HeaderPannel HeaderTitle="Add Combo Products" />
         <Box sx={{ width: "99%" }}>
           <Box
             sx={{
@@ -317,15 +311,15 @@ function CreateComboPage() {
 
               // if you also want to prevent duplicates in the list:
               const selectedIds = formData.services
-                .map((s, i) => (i === index ? null : s.product_id))
+                .map((s, i) => (i === index ? null : s.pr_id))
                 .filter(Boolean);
 
               const filteredOptions = options.filter(
-                (p) => !selectedIds.includes(p.product_id)
+                (p) => !selectedIds.includes(p.pr_id)
               );
 
               const selectedProd = storeProducts.find(
-                (p) => p.product_id === row.product_id
+                (p) => p.pr_id === row.pr_id
               );
 
               return (
@@ -348,18 +342,14 @@ function CreateComboPage() {
                           label={
                             formData.is_product === 0 ? "Products" : "Services"
                           }
-                          value={row.product_id}
+                          value={row.pr_id}
                           onChange={(e) =>
-                            handleServiceChange(
-                              index,
-                              "product_id",
-                              e.target.value
-                            )
+                            handleServiceChange(index, "pr_id", e.target.value)
                           }
                           disabled={loading}
                         >
                           {filteredOptions.map((p) => (
-                            <MenuItem key={p.product_id} value={p.product_id}>
+                            <MenuItem key={p.pr_id} value={p.pr_id}>
                               {p.product_name}
                             </MenuItem>
                           ))}
@@ -500,9 +490,8 @@ function CreateComboPage() {
                 onClick={handleCreateProduct}
                 disabled={
                   loading ||
-                  formData.services.filter(
-                    (s) => s.product_id && s.price !== ""
-                  ).length < 2
+                  formData.services.filter((s) => s.pr_id && s.price !== "")
+                    .length < 2
                 }
               >
                 {loading ? "Adding..." : "Add Combo"}

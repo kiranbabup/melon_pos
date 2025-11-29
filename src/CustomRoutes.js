@@ -32,12 +32,12 @@ const CustomeRoutes = () => {
       
       <Route element={<ProtectedRoute loggedinUserRole="admin" />}>
         <Route path="/admin_panel" element={<AdminPanelDashboard />} />
+        <Route path="/branch-billings" element={<AdminBillingPage />} />
+        <Route path="/manage_customers" element={<ManageCustomers />} />
         <Route path="/brands" element={<BrandsPage />} />
         <Route path="/inventory" element={<ManageInventoryPage />} />
         <Route path="/add-to-main" element={<CreateMainProducts />} />
 
-        <Route path="/branch-billings" element={<AdminBillingPage />} />
-        <Route path="/manage_customers" element={<ManageCustomers />} />
 
         <Route path="/create-combos" element={<CreateComboPage />} />
         <Route path="/display-combos" element={<DisplayCombosTable />} />
