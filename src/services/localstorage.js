@@ -1,5 +1,4 @@
 // localStorage.js
-const days = 1;
 export const storageKey = "melon";
 
 class LsService {
@@ -26,10 +25,7 @@ class LsService {
   }
 
   setCurrentUser(values) {
-    const now = new Date();
-    now.setDate(now.getDate() + days);
-    let data = { ...values, expiry: now.getTime() };
-    this.setItem(storageKey, data);
+    this.setItem(storageKey, values);
   }
 
   updateCurrentUser(values) {
@@ -42,13 +38,8 @@ class LsService {
   }
 
   getCurrentUser() {
-    const now = new Date();
     let data = this.getItem(storageKey);
     if (!data) {
-      return null;
-    }
-    if (now.getTime() > data.expiry) {
-      this.removeCurrentUser();
       return null;
     }
     return data;
@@ -58,6 +49,17 @@ class LsService {
     this.removeItem(storageKey);
     return true;
   }
+
+  getAccessToken() {
+    const user = this.getCurrentUser();
+    return user?.accessToken || null;
+  }
+
+  getRefreshToken() {
+    const user = this.getCurrentUser();
+    return user?.refreshToken || null;
+  }
+
 }
 
 export default new LsService();

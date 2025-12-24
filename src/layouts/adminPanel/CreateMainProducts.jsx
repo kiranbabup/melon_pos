@@ -75,7 +75,7 @@ function CreateMainProducts() {
         qty_alert: Number(formData.qty_alert),
 
         brand_id: Number(formData.brand_id),
-        is_product: isService ? 0 : 1, // <-- see note below
+        is_product: isService ? 0 : 1,
         barcode: isService ? null : Number(formData.barcode),
 
         description: formData.product_description || "",
@@ -193,13 +193,20 @@ function CreateMainProducts() {
                 </Grid>
               )}
               <Grid item size={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Brand</InputLabel>
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel id="brand-label">Brand</InputLabel>
+
                   <Select
+                    labelId="brand-label"
+                    id="brand-select"
                     name="brand_id"
                     value={formData.brand_id}
+                    label="Brand"
                     onChange={handleChange}
                     disabled={loading}
+                    MenuProps={{
+                      disablePortal: true, // 👈 ensures dropdown opens below
+                    }}
                   >
                     {brands.map((b) => (
                       <MenuItem key={b.brand_id} value={b.brand_id}>
@@ -212,7 +219,11 @@ function CreateMainProducts() {
               <Grid item size={6}>
                 <TextField
                   fullWidth
-                  label="Product Name"
+                  label={
+                    Number(formData.category_id) === 1
+                      ? "Product Name"
+                      : "Service Name"
+                  }
                   name="product_name"
                   value={formData.product_name}
                   onChange={handleChange}
@@ -368,7 +379,11 @@ function CreateMainProducts() {
                 onClick={handleCreateProduct}
                 disabled={loading}
               >
-                {loading ? "Creating..." : "Create Product"}
+                {loading
+                  ? "Creating..."
+                  : Number(formData.category_id) === 1
+                  ? "Create Product"
+                  : "Create Service"}
               </Button>
             </Box>
           </Box>

@@ -167,10 +167,10 @@ function CreateComboPage() {
       setProductErrMesg("Please select at least one item");
       return;
     }
-const servicesPayload = selectedServices.map((s) => ({
-  pr_id: Number(s.pr_id),   // or keep as string if API expects string
-  price: Number(s.price),
-}));
+    const servicesPayload = selectedServices.map((s) => ({
+      pr_id: Number(s.pr_id), // or keep as string if API expects string
+      price: Number(s.price),
+    }));
 
     try {
       setLoading(true);
@@ -334,11 +334,14 @@ const servicesPayload = selectedServices.map((s) => ({
                 >
                   <Grid container spacing={2}>
                     <Grid item size={3}>
-                      <FormControl fullWidth>
-                        <InputLabel>
+                      <FormControl fullWidth variant="outlined">
+                        <InputLabel id={`product-label-${index}`}>
                           {formData.is_product === 0 ? "Products" : "Services"}
                         </InputLabel>
+
                         <Select
+                          labelId={`product-label-${index}`}
+                          id={`product-select-${index}`}
                           label={
                             formData.is_product === 0 ? "Products" : "Services"
                           }
@@ -347,6 +350,14 @@ const servicesPayload = selectedServices.map((s) => ({
                             handleServiceChange(index, "pr_id", e.target.value)
                           }
                           disabled={loading}
+                          MenuProps={{
+                            disablePortal: true,
+                            PaperProps: {
+                              style: {
+                                maxHeight: 250,
+                              },
+                            },
+                          }}
                         >
                           {filteredOptions.map((p) => (
                             <MenuItem key={p.pr_id} value={p.pr_id}>

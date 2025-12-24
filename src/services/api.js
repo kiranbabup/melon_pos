@@ -3,23 +3,129 @@ import axios from 'axios'
 import LsService from './localstorage';
 
 export const baseURL = 'https://melon.invtechnologies.in/'
-// export const baseURL = 'http://192.168.0.104:1538/'
+// export const baseURL = 'http://192.168.0.108:1538/'
+
+const refreshApi = axios.create({
+  baseURL,
+  headers: { "Content-Type": "application/json" },
+});
 
 const api = axios.create({
   baseURL,
   headers: { 'Content-Type': 'application/json', },
 })
 
-api.interceptors.request.use((config) => {
-  const user = LsService.getCurrentUser(); // or from somewhere else
-  if (user?.token) {
-    // Make sure headers exists
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${user.token}`;
-  }
-  return config;
-},
+
+/* ================= REQUEST INTERCEPTOR ================= */
+api.interceptors.request.use(
+  (config) => {
+    const user = LsService.getCurrentUser();
+    if (user?.accessToken) {
+      config.headers.Authorization = `Bearer ${user.accessToken}`;
+    }
+    return config;
+  },
   (error) => Promise.reject(error)
+);
+
+/* ================= RESPONSE INTERCEPTOR ================= */
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  // (response) => { console.log("✅ API success:", response.config.url); return response; },
+  async (error) => {
+    // console.log("❌ API error:", error.config?.url, error.response?.status);
+    const originalRequest = error.config;
+
+    if (!error.response) {
+      return Promise.reject(error);
+    }
+
+    if (error.response.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    const isAuthEndpoint =
+      originalRequest.url.includes("/auth/login") ||
+      originalRequest.url.includes("/auth/refresh-token");
+
+    if (isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    if (originalRequest._retry) {
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        failedQueue.push({
+          resolve: (token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          },
+          reject,
+        });
+      });
+    }
+
+    isRefreshing = true;
+
+    try {
+      const refreshToken = LsService.getRefreshToken();
+      if (!refreshToken) throw new Error("No refresh token");
+
+      const res = await refreshApi.post(
+        "auth/refresh",
+        { refreshToken }
+      );
+      // console.log(res.data);
+      
+      const newAccessToken = res.data.accessToken;
+
+      const user = LsService.getCurrentUser();
+      user.accessToken = newAccessToken;
+      LsService.setCurrentUser(user);
+
+      api.defaults.headers.Authorization =
+        `Bearer ${newAccessToken}`;
+
+      processQueue(null, newAccessToken);
+
+      originalRequest.headers.Authorization =
+        `Bearer ${newAccessToken}`;
+
+      return api(originalRequest);
+    } catch (err) {
+      processQueue(err, null);
+      // console.log(err.response);
+      
+      // 🔥 logout ONLY if refresh token is invalid/expired
+      if (err.response?.status === 500) {
+        LsService.removeCurrentUser();
+        window.location.href = "/login";
+      }
+
+      return Promise.reject(err);
+    } finally {
+      isRefreshing = false;
+    }
+  }
 );
 
 // login API
@@ -110,89 +216,5 @@ export const addCombo = (data) =>
 
 export const getCombosByBranch = (branch_id) =>
   api.get(`combo/fetch-combos/${branch_id}`)
-
-
-
-
-
-
-
-// fetch API's
-
-export const getStoreDashboardStats = (storeid) =>
-  api.get(`get_store_dashboard_statastics/${storeid}`)
-
-// category management APIs
-export const getAllCategories = () =>
-  api.get('get_all_categories')
-
-export const createCategory = (data) =>
-  api.post('create_category', data)
-
-export const updateCategory = (id, data) =>
-  api.put(`update_category/${id}`, data)
-
-// supplier management APIs
-export const createSupplier = (data) =>
-  api.post('create_supplier', data)
-
-export const getAllSuppliers = () =>
-  api.get('get_all_suppliers')
-
-export const updateSupplier = (id, data) =>
-  api.put(`update_supplier/${id}`, data)
-
-// unit management APIs
-export const createUnit = (data) =>
-  api.post('create_unit', data)
-
-export const getAllUnits = () =>
-  api.get('get_all_units')
-
-export const updateUnit = (id, data) =>
-  api.put(`update_unit/${id}`, data)
-
-// store management APIs
-export const getAllStores = () =>
-  api.get('get_all_stores')
-
-export const createStore = (data) =>
-  api.post('create_stores', data)
-
-export const updateStore = (id, data) =>
-  api.put(`update_store_by_id/${id}`, data)
-
-// store products management APIs
-export const createStoreProducts = (data) =>
-  api.post('crete_store_products', data)
-
-export const getStoreDetailsbyId = (storeid) =>
-  api.get(`get_dummy_store_details/${storeid}`)
-
-export const getStoreInvtryDetails = (storeid) =>
-  api.get(`get_store_details/${storeid}`)
-
-export const updateRemarks = (id, data) =>
-  api.put(`update_checked/${id}`, data)
-
-export const updateConfirm = (id, data) =>
-  api.put(`update_confirmed/${id}`, data)
-
-export const get_store_product_details = (search, store_id) =>
-  api.get('get_store_product_details', { params: { search, store_id } })
-
-// customer management APIs
-export const get_customer_data = async (phone) => {
-  return await api.get(`check_customer_purchasing_data/${phone}`);
-};
-
-export const getStoreUsers = (storeid) =>
-  api.get(`get_store_users/${storeid}`)
-
-export const getLastOrder = (payload) =>
-  api.post("get_last_order", payload)
-
-// export const getAllEmployeePaymentData = () =>
-//   api.get('get_all_employee_payment_data')
 
 export default api;

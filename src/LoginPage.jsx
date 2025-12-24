@@ -50,7 +50,7 @@ const LoginPage = () => {
     try {
       const response = await login({ email: loginId, password });
       // console.log(response.data);
-      const { token } = response.data;
+      const { accessToken, refreshToken } = response.data;
       const branchDetails = response.data.user.Branch;
       const { branch_id, name, role, status, user_id } = response.data.user;
       if (!status) {
@@ -59,15 +59,18 @@ const LoginPage = () => {
         );
         return;
       }
+
       LsService.setCurrentUser({
         username: name,
         role,
         branch_id,
         email: loginId,
         user_id,
-        token,
+        accessToken, // ✅ add
+        refreshToken, // ✅ add
         branchDetails,
       });
+
       if (role === "super_admin") {
         navigate("/super_admin");
       } else if (role === "admin") {
